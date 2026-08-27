@@ -1,0 +1,66 @@
+# Dependencies
+node_modules
+**/node_modules
+.venv
+**/.venv
+
+# Next.js & Frontend Build Outputs
+.next
+**/.next
+out
+dist
+build
+*.tsbuildinfo
+
+# Python & Backend Artifacts
+__pycache__
+**/__pycache__
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache
+**/.pytest_cache
+.ruff_cache
+**/.ruff_cache
+.coverage
+htmlcov
+
+# Local Database and File Storage
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+openresearch_dev.db
+apps/api/openresearch_dev.db
+storage/uploads/*
+!storage/uploads/.gitkeep
+
+# Environment and Secrets
+**/.env
+!**/.env.example
+*.pem
+*.key
+
+# Git and CI/CD
+.git
+.github
+.devcontainer
+
+# Editor and OS
+.vscode
+.idea
+.DS_Store
+Thumbs.db
+
+# Documentation and Reports
+report/
+docs/audits/
+audit-reports
+
+# Logs
+*.log
+
+# Misc
+coverage
+Starting

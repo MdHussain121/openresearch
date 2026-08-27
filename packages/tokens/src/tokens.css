@@ -1,0 +1,124 @@
+/**
+ * OpenResearch Design Tokens
+ * Source: OpenResearch_UI_UX_Guidelines.md v1
+ */
+
+:root {
+  /* Light theme (default) */
+  --bg-canvas: #FAFAF9;
+  --bg-surface: #FFFFFF;
+  --bg-sunken: #F1F0EE;
+  
+  --text-primary: #1A1A18;
+  --text-secondary: #5C5B57;
+  --text-tertiary: #706F6A;
+  
+  --border-default: #E4E2DE;
+  --border-input: #8A8985;
+  --accent-primary: #2C5F4A;
+  --accent-primary-hover: #234B3B;
+
+  /* Solid-fill foreground colors for light theme */
+  --accent-solid-fg: #FFFFFF;
+  --danger-solid-fg: #FFFFFF;
+
+  /* Semantic / Trust Colors (Light) */
+  --source-grounded: #2C5F4A;
+  --ai-inference: #8A5A2B;
+  --general-knowledge: #5C5B57;
+  --warning: #B4522A;
+  --danger: #B33A3A;
+  --success: #3A7D5C;
+
+  /* Spacing Grid (Comfortable mode default) */
+  --space-unit: 8px;
+  --spacing-component-padding: 16px;
+  --spacing-list-rhythm: 12px;
+
+  /* Layout dimensions */
+  --topbar-height: 48px;
+  --sidebar-width: 220px;
+  --sidebar-collapsed-width: 56px;
+  --editor-max-width: 720px;
+  --source-panel-width: 320px;
+  --source-panel-collapsed-width: 32px;
+
+  /* Typography Scale */
+  --font-size-12: 12px;
+  --font-size-14: 14px;
+  --font-size-16: 16px;
+  --font-size-17: 17px;
+  --font-size-20: 20px;
+  --font-size-24: 24px;
+  --font-size-32: 32px;
+
+  /* Motion Tokens — transitions.dev scale (backwards-compat aliases kept) */
+  --duration-instant: 80ms;
+  --duration-micro: 80ms;
+  --duration-stagger: 40ms;
+  --duration-quick: 150ms;
+  --duration-fast: 150ms;
+  --duration-moderate: 200ms;
+  --duration-emphasis: 250ms;
+  --duration-long: 350ms;
+  --duration-medium: 350ms;
+  --duration-slow: 400ms;
+  --duration-very-slow: 500ms;
+  --ease-default: cubic-bezier(0.2, 0, 0, 1);
+  --ease-emphasized: cubic-bezier(0.05, 0.7, 0.1, 1);
+  --ease-spring: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-in-out: ease-in-out;
+  --ease-linear: linear;
+  --ease-bounce-strong: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-out: cubic-bezier(0.23, 1, 0.32, 1);
+  --distance-micro: 4px;
+  --distance-small: 6px;
+  --distance-base: 8px;
+  --distance-medium: 12px;
+  --scale-large: 0.96;
+  --scale-medium: 0.97;
+  --scale-small: 0.98;
+  --scale-tiny: 0.99;
+  --scale-enter: 0.98;
+  --scale-pressed: 0.97;
+  --blur-small: 2px;
+  --blur-medium: 3px;
+  --blur-entrance: 6px;
+  --blur-overlay: 8px;
+}
+
+[data-theme="dark"] {
+  /* Dark theme */
+  --bg-canvas: #17171A;
+  --bg-surface: #1E1E22;
+  --bg-sunken: #131315;
+  
+  --text-primary: #EDECE9;
+  --text-secondary: #A6A4A0;
+  --text-tertiary: #918F8A;
+  
+  --border-default: #6C6C78;
+  --border-input: #8E8E8E;
+  --accent-primary: #5FA98A;
+  --accent-primary-hover: #72BCA0;
+
+  /* Solid-fill foreground colors for dark theme (AA 4.5:1 on fill) */
+  --accent-solid-fg: #101512;
+  --danger-solid-fg: #1A0A0A;
+
+  /* Semantic / Trust Colors (Dark) */
+  --source-grounded: #5FA98A;
+  --ai-inference: #C99A5F;
+  --general-knowledge: #A6A4A0;
+  --warning: #E08558;
+  --danger: #E06666;
+  --success: #6BC79A;
+}
+
+[data-density="compact"] {
+  /* Compact density mode */
+  --spacing-component-padding: 8px;
+  --spacing-list-rhythm: 8px;
+}

@@ -1,0 +1,36 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["DOM", "DOM.Iterable", "ESNext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "forceConsistentCasingInFileNames": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "paths": {
+      "@openresearch/tokens": ["packages/tokens/src/index.ts"],
+      "@openresearch/tokens/*": ["packages/tokens/src/*"],
+      "@openresearch/editor": ["packages/editor/src/index.ts"],
+      "@openresearch/editor/*": ["packages/editor/src/*"],
+      "@openresearch/citations": ["packages/citations/src/index.ts"],
+      "@openresearch/citations/*": ["packages/citations/src/*"],
+      "@openresearch/research": ["packages/research/src/index.ts"],
+      "@openresearch/research/*": ["packages/research/src/*"],
+      "@openresearch/ai": ["packages/ai/src/index.ts"],
+      "@openresearch/ai/*": ["packages/ai/src/*"],
+      "@openresearch/plugins": ["packages/plugins/src/index.ts"],
+      "@openresearch/plugins/*": ["packages/plugins/src/*"],
+      "@openresearch/ui": ["packages/ui/src/index.ts"],
+      "@openresearch/ui/*": ["packages/ui/src/*"]
+    }
+  },
+  "exclude": ["node_modules", "dist", ".next"]
+}

@@ -1,0 +1,18 @@
+{
+  "name": "@openresearch/research",
+  "version": "0.1.0",
+  "description": "ResearchProvider abstraction for OpenAlex, Crossref, arXiv, and Semantic Scholar",
+  "main": "src/index.ts",
+  "types": "src/index.ts",
+  "dependencies": {
+    "@openresearch/citations": "*"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.5"
+  },
+  "license": "AGPL-3.0-or-later"
+}

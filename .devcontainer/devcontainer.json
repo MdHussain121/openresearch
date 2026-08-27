@@ -1,0 +1,71 @@
+{
+  "name": "OpenResearch Development Container",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:1-20-bullseye",
+  "features": {
+    "ghcr.io/devcontainers/features/python:1": {
+      "version": "3.11",
+      "installTools": true
+    },
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {
+      "version": "latest",
+      "enableNonRootDocker": true
+    }
+  },
+  "forwardPorts": [3000, 8000, 5432, 6379, 8070, 11434],
+  "portsAttributes": {
+    "3000": {
+      "label": "OpenResearch Web",
+      "onAutoForward": "openPreview"
+    },
+    "8000": {
+      "label": "OpenResearch API",
+      "onAutoForward": "silent"
+    },
+    "5432": {
+      "label": "PostgreSQL Vector DB",
+      "onAutoForward": "silent"
+    },
+    "6379": {
+      "label": "Redis Cache & Pub/Sub",
+      "onAutoForward": "silent"
+    },
+    "8070": {
+      "label": "GROBID PDF TEI Service",
+      "onAutoForward": "silent"
+    },
+    "11434": {
+      "label": "Ollama LLM Engine",
+      "onAutoForward": "silent"
+    }
+  },
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "charliermarsh.ruff",
+        "ms-python.python",
+        "ms-python.vscode-pylance",
+        "dbaeumer.vscode-eslint",
+        "bradlc.vscode-tailwindcss",
+        "esbenp.prettier-vscode",
+        "tamasfe.even-better-toml"
+      ],
+      "settings": {
+        "python.defaultInterpreterPath": "/usr/local/bin/python",
+        "python.testing.pytestArgs": ["apps/api/tests"],
+        "python.testing.unittestEnabled": false,
+        "python.testing.pytestEnabled": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[python]": {
+          "editor.defaultFormatter": "charliermarsh.ruff",
+          "editor.formatOnSave": true,
+          "editor.codeActionsOnSave": {
+            "source.fixAll": "explicit",
+            "source.organizeImports": "explicit"
+          }
+        }
+      }
+    }
+  },
+  "postCreateCommand": "npm install && pip install -r apps/api/requirements.txt"
+}

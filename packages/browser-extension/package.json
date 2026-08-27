@@ -1,0 +1,18 @@
+﻿{
+  "name": "@openresearch/browser-extension",
+  "version": "1.0.1",
+  "private": true,
+  "description": "OpenResearch Browser Extension â€” 1-Click Paper Capture to OpenResearch Library",
+  "scripts": {
+    "build": "echo 'Extension ready in packages/browser-extension'"
+  },
+  "keywords": [
+    "openresearch",
+    "browser-extension",
+    "manifest-v3",
+    "zotero",
+    "citations"
+  ],
+  "author": "OpenResearch Contributors",
+  "license": "AGPL-3.0-or-later"
+}

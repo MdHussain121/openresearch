@@ -1,0 +1,154 @@
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.web
+      args:
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:8000/api/v1}
+    container_name: openresearch-selfhost-web
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-3000}:3000"
+    environment:
+      - NODE_ENV=production
+    depends_on:
+      api:
+        condition: service_healthy
+    mem_limit: 1g
+    logging: *default-logging
+
+  api-migrate:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: openresearch-selfhost-migrate
+    env_file: .env.selfhost
+    environment:
+      ENVIRONMENT: production
+      DATABASE_URL: postgresql://${POSTGRES_USER:-openresearch}:${POSTGRES_PASSWORD:-openresearch_secure_password}@db:5432/${POSTGRES_DB:-openresearch}
+      REDIS_URL: redis://:${REDIS_PASSWORD}@redis:6379/0
+      GROBID_HOST: http://grobid:8070
+      OLLAMA_HOST: http://ollama:11434
+      UPLOAD_DIR: /app/storage
+    command: >
+      python -c "import os,sqlalchemy as sa,alembic.config as c;
+      cfg=c.Config('alembic.ini');
+      cfg.set_main_option('script_location','alembic');
+      e=sa.create_engine(os.environ['DATABASE_URL']);
+      insp=sa.inspect(e);
+      t=set(insp.get_table_names());
+      from alembic import command;
+      command.stamp(cfg,'head') if ('alembic_version' not in t and t) else command.upgrade(cfg,'head')"
+    depends_on:
+      db:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 512m
+    logging: *default-logging
+
+  api:
+    build:
+      context: ..
+      dockerfile: infrastructure/Dockerfile.api
+    container_name: openresearch-selfhost-api
+    restart: unless-stopped
+    ports:
+      - "${API_PORT:-8000}:8000"
+    environment:
+      - ENVIRONMENT=production
+      - SECRET_KEY=${SECRET_KEY:?SECRET_KEY must be set in your .env file with at least 32 random characters}
+      - DATABASE_URL=postgresql://${POSTGRES_USER:-openresearch}:${POSTGRES_PASSWORD:-openresearch_secure_password}@db:5432/${POSTGRES_DB:-openresearch}
+      - REDIS_URL=redis://:${REDIS_PASSWORD:?REDIS_PASSWORD must be set in your .env file}@redis:6379/0
+      - GROBID_HOST=http://grobid:8070
+      - OLLAMA_HOST=http://ollama:11434
+      - UPLOAD_DIR=/app/storage
+    volumes:
+      - openresearch_storage:/app/storage
+    depends_on:
+      db:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      api-migrate:
+        condition: service_completed_successfully
+    mem_limit: 1g
+    logging: *default-logging
+
+  db:
+    image: pgvector/pgvector:pg16
+    container_name: openresearch-selfhost-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-openresearch}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-openresearch_secure_password}
+      POSTGRES_DB: ${POSTGRES_DB:-openresearch}
+    ports:
+      - "127.0.0.1:5432:5432"
+    volumes:
+      - openresearch_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-openresearch}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 1g
+    logging: *default-logging
+
+  redis:
+    image: redis:7-alpine
+    container_name: openresearch-selfhost-redis
+    restart: unless-stopped
+    command: ["redis-server", "--requirepass", "${REDIS_PASSWORD:?REDIS_PASSWORD must be set in your .env file}"]
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - openresearch_redisdata:/data
+    environment:
+      - REDIS_PASSWORD=${REDIS_PASSWORD:?REDIS_PASSWORD must be set in your .env file}
+    healthcheck:
+      test: ["CMD-SHELL", "REDISCLI_AUTH=$$REDIS_PASSWORD redis-cli ping | grep PONG"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    mem_limit: 256m
+    logging: *default-logging
+
+  grobid:
+    image: lfoppiano/grobid:0.8.0
+    container_name: openresearch-selfhost-grobid
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8070:8070"
+    environment:
+      JAVA_OPTS: "-Xmx4g"
+    mem_limit: 5g
+    logging: *default-logging
+
+  ollama:
+    image: ollama/ollama:latest
+    container_name: openresearch-selfhost-ollama
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:11434:11434"
+    volumes:
+      - openresearch_ollama:/root/.ollama
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 8g
+    logging: *default-logging
+
+volumes:
+  openresearch_pgdata:
+  openresearch_redisdata:
+  openresearch_storage:
+  openresearch_ollama:

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="or-tile" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#35705A"/>
+      <stop offset="1" stop-color="#224A3B"/>
+    </linearGradient>
+  </defs>
+  <rect width="64" height="64" rx="14.5" fill="url(#or-tile)"/>
+  <path d="M23.38 37.73 A11.25 11.25 0 1 1 40.62 37.73 M40.62 37.73 L40.62 46.5 L45.62 46.5 M23.38 37.73 L23.38 46.5 L18.38 46.5"
+        fill="none" stroke="#FAF9F6" stroke-width="6.5" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

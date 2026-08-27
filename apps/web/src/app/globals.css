@@ -1,0 +1,202 @@
+@import "@openresearch/tokens/tokens.css";
+@import "katex/dist/katex.min.css";
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  background-color: var(--bg-canvas);
+  color: var(--text-primary);
+  font-family: var(--font-sans), Inter, system-ui, -apple-system, sans-serif;
+  margin: 0;
+  padding: 0;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Custom scrollbars matching academic restraint */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg-sunken);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border-default);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-tertiary);
+}
+
+@keyframes slide-in-right {
+  from {
+    transform: translateX(var(--distance-base));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slide-in-left {
+  from {
+    transform: translateX(calc(var(--distance-base) * -1));
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fade-slide-in {
+  from {
+    opacity: 0;
+    transform: translateY(var(--distance-micro));
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes pulse-subtle {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.6; }
+}
+
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+.animate-slide-in-right {
+  animation: slide-in-right var(--duration-emphasis) var(--ease-smooth-out) both;
+}
+
+.animate-slide-in-left {
+  animation: slide-in-left var(--duration-emphasis) var(--ease-smooth-out) both;
+}
+
+.animate-slide-left {
+  animation: slide-in-left var(--duration-emphasis) var(--ease-smooth-out) both;
+}
+
+.animate-fade-slide-in {
+  animation: fade-slide-in var(--duration-emphasis) var(--ease-smooth-out) both;
+}
+
+.animate-pulse-subtle {
+  animation: pulse-subtle 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-pulse-subtle {
+    animation: none;
+  }
+}
+
+.animate-shimmer {
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .animate-shimmer {
+    animation: none;
+  }
+}
+
+/* Skeleton shimmer base */
+.skeleton {
+  position: relative;
+  overflow: hidden;
+  background: var(--bg-sunken);
+}
+
+.skeleton::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  transform: translateX(-100%);
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.4s linear infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skeleton::after {
+    animation: none;
+  }
+}
+
+[data-theme="dark"] .skeleton::after {
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.06), transparent);
+}
+
+/* Focus ring fade */
+*:focus-visible {
+  transition: box-shadow var(--duration-quick) var(--ease-smooth-out);
+}
+
+/* @starting-style for interruptible enter animations (toast, drawers) */
+@starting-style {
+  [data-state="open"] {
+    opacity: 0;
+  }
+  [data-state="open"].toast-enter {
+    transform: translateX(-50%) translateY(10px);
+    transition-duration: var(--duration-emphasis);
+  }
+  [data-state="open"].drawer-enter {
+    transform: translateX(100%);
+    transition-duration: var(--duration-medium);
+  }
+  [data-state="open"].backdrop-enter {
+    opacity: 0;
+    transition-duration: var(--duration-quick);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, ::before, ::after {
+    animation-duration: 10ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 10ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Preserve opacity/color for comprehension */
+  *:not(.no-reduced-opacity) {
+    transition-duration: 150ms !important;
+    transition-property: opacity, background-color, color, border-color !important;
+    transition-timing-function: ease !important;
+  }
+}
+
+/* Preserve comprehension: ensure animated content remains visible when motion is reduced */
+@media (prefers-reduced-motion: reduce) {
+  .animate-fade-slide-in,
+  [class*="animate-in"] {
+    opacity: 1 !important;
+    transform: none !important;
+  }
+}
+
+/* Touch-friendly hover guard - only apply hover transforms on fine-pointer devices */
+@media (hover: hover) and (pointer: fine) {
+  .hover-lift:hover {
+    transform: translateY(-1px);
+  }
+  .hover-lift:hover + * {
+    transform: translateY(-1px);
+  }
+}
+
+html {
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-default) var(--bg-sunken);
+}

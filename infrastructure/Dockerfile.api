@@ -1,0 +1,50 @@
+# syntax=docker/dockerfile:1
+
+########## Stage 1: builder -- compile/download wheels ##########
+ARG PYTHON_VERSION=3.11.9
+FROM python:${PYTHON_VERSION}-slim-bookworm AS builder
+
+ENV PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PIP_NO_CACHE_DIR=1
+
+WORKDIR /build
+
+RUN pip install --no-cache-dir "pip>=26.1.2" "setuptools>=83.0.0"
+
+COPY apps/api/requirements-prod.txt ./requirements.txt
+RUN pip wheel --wheel-dir /wheels -r requirements.txt
+
+########## Stage 2: runtime -- minimal, non-root, signal-safe ##########
+FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
+
+RUN groupadd --system --gid 1001 python \
+ && useradd --system --uid 1001 --gid python --home-dir /app apiuser
+
+WORKDIR /app/apps/api
+
+COPY --from=builder /wheels /tmp/wheels
+RUN pip install --no-cache-dir "pip>=26.1.2" "setuptools>=83.0.0" && \
+ pip install --no-cache-dir --no-compile /tmp/wheels/*.whl && \
+ rm -rf /tmp/wheels && \
+ mkdir -p /app/storage && \
+ chown -R apiuser:python /app/storage
+
+COPY --chown=apiuser:python apps/api/app ./app
+COPY --chown=apiuser:python apps/api/alembic ./alembic
+COPY --chown=apiuser:python apps/api/alembic.ini ./alembic.ini
+
+USER 1001:1001
+
+ENV PYTHONPATH=/app/apps/api \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PORT=8000 \
+    WEB_CONCURRENCY=1
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=3 \
+  CMD ["python", "-c", "import urllib.request,sys;\
+sys.exit(0 if urllib.request.urlopen('http://127.0.0.1:8000/api/v1/health',timeout=4).status==200 else 1)"]
+
+CMD ["sh", "-c", "exec uvicorn app.main:app --host 0.0.0.0 --port ${PORT} --workers ${WEB_CONCURRENCY}"]

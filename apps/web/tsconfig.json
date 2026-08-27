@@ -1,0 +1,43 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "target": "ES2022",
+    "lib": ["dom", "dom.iterable", "esnext"],
+    "allowJs": true,
+    "skipLibCheck": true,
+    "strict": true,
+    "noEmit": true,
+    "esModuleInterop": true,
+    "module": "esnext",
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "isolatedModules": true,
+    "jsx": "preserve",
+    "incremental": true,
+    "baseUrl": ".",
+    "plugins": [
+      {
+        "name": "next"
+      }
+    ],
+    "paths": {
+      "@/*": ["./src/*"],
+      "@openresearch/tokens": ["../../packages/tokens/src/index.ts"],
+      "@openresearch/tokens/*": ["../../packages/tokens/src/*"],
+      "@openresearch/editor": ["../../packages/editor/src/index.ts"],
+      "@openresearch/editor/*": ["../../packages/editor/src/*"],
+      "@openresearch/citations": ["../../packages/citations/src/index.ts"],
+      "@openresearch/citations/*": ["../../packages/citations/src/*"],
+      "@openresearch/research": ["../../packages/research/src/index.ts"],
+      "@openresearch/research/*": ["../../packages/research/src/*"],
+      "@openresearch/ai": ["../../packages/ai/src/index.ts"],
+      "@openresearch/ai/*": ["../../packages/ai/src/*"],
+      "@openresearch/plugins": ["../../packages/plugins/src/index.ts"],
+      "@openresearch/plugins/*": ["../../packages/plugins/src/*"],
+      "@openresearch/ui": ["../../packages/ui/src/index.ts"],
+      "@openresearch/ui/*": ["../../packages/ui/src/*"]
+    }
+  },
+  "include": ["next-env.d.ts", "**/*.ts", "**/*.tsx", ".next/types/**/*.ts"],
+  "exclude": ["node_modules"]
+}
