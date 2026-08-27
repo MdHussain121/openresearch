@@ -138,7 +138,7 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
 
   return (
     <aside
-      className={`border-l border-border-default bg-surface flex flex-col shrink-0 overflow-y-auto overflow-x-visible contain-layout w-[var(--source-panel-width)] ${
+      className={`border-l border-border-default bg-surface flex flex-col shrink-0 overflow-visible contain-layout w-[var(--source-panel-width)] ${
         isCollapsed ? 'translate-x-full' : 'translate-x-0'
       }`}
       style={{
@@ -146,6 +146,7 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
         transition: 'transform 250ms var(--ease-smooth-out)',
       }}
     >
+      <div className="flex flex-col flex-1 overflow-y-auto">
       {/* Collapsed Indicator - absolutely positioned on left edge */}
       {isCollapsed && (
         <div
@@ -426,6 +427,7 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
           </TabsContent>
         </div>
       </Tabs>
+      </div>
     </aside>
   );
 };
