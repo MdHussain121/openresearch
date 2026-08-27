@@ -29,6 +29,37 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
   const containerRef = useRef<HTMLDivElement>(null);
   const listboxId = 'citation-popover-listbox';
 
+  const position = useMemo(() => {
+    if (typeof window === 'undefined') return { top: 0, left: 16 };
+    const POPOVER_WIDTH = 360;
+    const POPOVER_HEIGHT = 320;
+    const GAP = 4;
+    const MARGIN = 16;
+
+    let left = Math.max(MARGIN, Math.min(coords.left, window.innerWidth - POPOVER_WIDTH - MARGIN));
+    const spaceBelow = window.innerHeight - coords.top - GAP;
+    const spaceAbove = coords.top - MARGIN;
+
+    let top: number;
+    if (spaceBelow >= POPOVER_HEIGHT) {
+      top = coords.top + GAP;
+    } else if (spaceAbove >= POPOVER_HEIGHT) {
+      top = coords.top - POPOVER_HEIGHT - GAP;
+    } else if (spaceBelow >= spaceAbove) {
+      top = coords.top + GAP;
+    } else {
+      top = MARGIN;
+    }
+
+    // Clamp within viewport
+    if (top < MARGIN) top = MARGIN;
+    if (top + POPOVER_HEIGHT > window.innerHeight - MARGIN) {
+      top = window.innerHeight - POPOVER_HEIGHT - MARGIN;
+    }
+
+    return { top, left };
+  }, [coords, isOpen]);
+
   // Compute live ranking combining query filter and context relevance
   const filteredPapers = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -138,8 +169,8 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
       aria-activedescendant={filteredPapers[selectedIndex] ? `citation-option-${filteredPapers[selectedIndex].id}` : undefined}
       tabIndex={-1}
       style={{
-        top: `${coords.top + 24}px`,
-        left: `${Math.max(16, Math.min(coords.left, window.innerWidth - 380))}px`,
+        top: `${position.top}px`,
+        left: `${position.left}px`,
       }}
       className="fixed z-50 w-[360px] max-h-[320px] rounded-lg border border-border-default bg-surface shadow-lg flex flex-col overflow-hidden text-xs animate-in fade-in duration-80 ease-smooth-out"
     >

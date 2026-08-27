@@ -595,7 +595,7 @@
     "askInChat": "Ask AI in Chat"
   },
   "plugins": {
-    "title": "Plugin System & Extensions",
+    "title": "Plugins & Extensions",
     "subtitle": "Manage modular extensions respecting the AGPL-3.0 boundary (Roadmap 9.4)",
     "installed": "Installed Plugins",
     "pluginType": "Type",

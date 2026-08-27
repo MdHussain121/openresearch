@@ -146,8 +146,9 @@ class LLMService:
         ):
             return self._tabby_available
         try:
-            client = get_sync_http_client()
-            resp = client.get(f"{base_url}/v1/health", timeout=2.0)
+            with self._http_semaphore:
+                client = get_sync_http_client()
+                resp = client.get(f"{base_url}/v1/health", timeout=2.0)
             self._tabby_available = resp.status_code == 200
         except Exception as exc:
             logger.warning("Tabby probe failed: %s", exc)
@@ -194,12 +195,13 @@ class LLMService:
             return None
 
         try:
-            client = get_sync_http_client()
-            resp = client.post(
-                f"{base_url}/v1/completions",
-                json=self.build_completion_payload(prefix, suffix),
-                timeout=timeout_seconds,
-            )
+            with self._http_semaphore:
+                client = get_sync_http_client()
+                resp = client.post(
+                    f"{base_url}/v1/completions",
+                    json=self.build_completion_payload(prefix, suffix),
+                    timeout=timeout_seconds,
+                )
             if resp.status_code != 200:
                 logger.warning("Tabby returned status %s", resp.status_code)
                 self._tabby_available = False
@@ -253,16 +255,17 @@ class LLMService:
             "messages": messages,
             "temperature": temperature,
         }
-        client = get_sync_http_client()
-        resp = client.post(
-            f"{base_url}/chat/completions",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {creds['api_key']}",
-                "Content-Type": "application/json",
-            },
-            timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
-        )
+        with self._http_semaphore:
+            client = get_sync_http_client()
+            resp = client.post(
+                f"{base_url}/chat/completions",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {creds['api_key']}",
+                    "Content-Type": "application/json",
+                },
+                timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
+            )
         if resp.status_code != 200:
             logger.warning("OpenAI-compatible provider returned status %s", resp.status_code)
             return None
@@ -290,17 +293,18 @@ class LLMService:
         }
         if system_text:
             payload["system"] = system_text
-        client = get_sync_http_client()
-        resp = client.post(
-            f"{base_url}/v1/messages",
-            json=payload,
-            headers={
-                "x-api-key": creds["api_key"],
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-            },
-            timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
-        )
+        with self._http_semaphore:
+            client = get_sync_http_client()
+            resp = client.post(
+                f"{base_url}/v1/messages",
+                json=payload,
+                headers={
+                    "x-api-key": creds["api_key"],
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                },
+                timeout=timeout_seconds or settings.LLM_TIMEOUT_SECONDS,
+            )
         if resp.status_code != 200:
             logger.warning("Anthropic returned status %s", resp.status_code)
             return None
@@ -397,18 +401,19 @@ class LLMService:
             "options": {"temperature": temperature},
         }
         try:
-            client = get_sync_http_client()
-            with client.stream(
-                "POST",
-                f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
-                json=payload,
-                timeout=self._stream_timeout(timeout_seconds),
-            ) as resp:
-                if resp.status_code != 200:
-                    logger.warning("Ollama returned status %s during stream", resp.status_code)
-                    self._available = False
-                    self._checked_at = time.monotonic()
-                    return
+            with self._http_semaphore:
+                client = get_sync_http_client()
+                with client.stream(
+                    "POST",
+                    f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/chat",
+                    json=payload,
+                    timeout=self._stream_timeout(timeout_seconds),
+                ) as resp:
+                    if resp.status_code != 200:
+                        logger.warning("Ollama returned status %s during stream", resp.status_code)
+                        self._available = False
+                        self._checked_at = time.monotonic()
+                        return
                 splitter = _ThinkTagSplitter()
                 for line in resp.iter_lines():
                     line = line.strip()
@@ -460,23 +465,24 @@ class LLMService:
             "temperature": temperature,
             "stream": True,
         }
-        client = get_sync_http_client()
-        with client.stream(
-            "POST",
-            f"{base_url}/chat/completions",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {creds['api_key']}",
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream",
-            },
-            timeout=self._stream_timeout(timeout_seconds),
-        ) as resp:
-            if resp.status_code != 200:
-                logger.warning(
-                    "OpenAI-compatible provider returned status %s during stream", resp.status_code
-                )
-                return
+        with self._http_semaphore:
+            client = get_sync_http_client()
+            with client.stream(
+                "POST",
+                f"{base_url}/chat/completions",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {creds['api_key']}",
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                },
+                timeout=self._stream_timeout(timeout_seconds),
+            ) as resp:
+                if resp.status_code != 200:
+                    logger.warning(
+                        "OpenAI-compatible provider returned status %s during stream", resp.status_code
+                    )
+                    return
             for data in self._iter_sse_data(resp):
                 if data == "[DONE]":
                     return
@@ -515,22 +521,23 @@ class LLMService:
         }
         if system_text:
             payload["system"] = system_text
-        client = get_sync_http_client()
-        with client.stream(
-            "POST",
-            f"{base_url}/v1/messages",
-            json=payload,
-            headers={
-                "x-api-key": creds["api_key"],
-                "anthropic-version": "2023-06-01",
-                "Content-Type": "application/json",
-                "Accept": "text/event-stream",
-            },
-            timeout=self._stream_timeout(timeout_seconds),
-        ) as resp:
-            if resp.status_code != 200:
-                logger.warning("Anthropic returned status %s during stream", resp.status_code)
-                return
+        with self._http_semaphore:
+            client = get_sync_http_client()
+            with client.stream(
+                "POST",
+                f"{base_url}/v1/messages",
+                json=payload,
+                headers={
+                    "x-api-key": creds["api_key"],
+                    "anthropic-version": "2023-06-01",
+                    "Content-Type": "application/json",
+                    "Accept": "text/event-stream",
+                },
+                timeout=self._stream_timeout(timeout_seconds),
+            ) as resp:
+                if resp.status_code != 200:
+                    logger.warning("Anthropic returned status %s during stream", resp.status_code)
+                    return
             for data in self._iter_sse_data(resp):
                 try:
                     event = json.loads(data)

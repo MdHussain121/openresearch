@@ -5,6 +5,7 @@ import {
   ChevronDown,
   Plus,
   Users,
+  User,
   Search,
   Loader2,
   CheckCircle2,
@@ -39,6 +40,7 @@ interface TopBarProps {
   onOpenShortcuts: () => void;
   onOpenNewProject: () => void;
   onOpenTeams: () => void;
+  onOpenAccount?: () => void;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -52,6 +54,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenShortcuts,
   onOpenNewProject,
   onOpenTeams,
+  onOpenAccount = () => {},
 }) => {
   return (
     <header className="h-topbar border-b border-border-default bg-surface px-4 flex items-center justify-between shrink-0 select-none z-30">
@@ -201,6 +204,21 @@ export const TopBar: React.FC<TopBarProps> = ({
             </button>
           </TooltipTrigger>
           <TooltipContent>{isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}</TooltipContent>
+        </Tooltip>
+
+        {/* Account Button */}
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <button
+              type="button"
+              onClick={onOpenAccount}
+              className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded border border-border-default hover:bg-sunken text-text-secondary transition-[transform,background-color,color] duration-150 active:scale-90 [@media(hover:hover)]:hover:-translate-y-px hidden sm:flex focus-visible:ring-2 focus-visible:ring-accent"
+              aria-label="Account"
+            >
+              <User className="w-4 h-4" />
+            </button>
+          </TooltipTrigger>
+          <TooltipContent>Account</TooltipContent>
         </Tooltip>
       </div>
     </header>

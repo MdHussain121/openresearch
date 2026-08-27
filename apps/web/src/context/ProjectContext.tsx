@@ -15,7 +15,7 @@ export interface Project {
 
 interface ProjectContextType {
   projects: Project[];
-  activeProject: Project | null;
+  activeProject: Project;
   isLoadingProjects: boolean;
   setActiveProject: (project: Project) => void;
   createProject: (name: string, description?: string) => Promise<Project>;
@@ -38,7 +38,7 @@ const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, isOfflineMode, isAuthenticated, isLoading: isAuthLoading } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
-  const [activeProject, setActiveProjectState] = useState<Project | null>(null);
+  const [activeProject, setActiveProjectState] = useState<Project>(DEFAULT_LOCAL_PROJECT);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
 
   const loadLocalProjects = useCallback((): Project[] => {
@@ -64,7 +64,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refreshProjects = useCallback(async () => {
     setIsLoadingProjects(true);
-    if (isAuthLoading) return;
+    if (isAuthLoading) {
+      setIsLoadingProjects(false);
+      return;
+    }
     if (isAuthenticated && !isOfflineMode) {
       try {
         const serverProjects = await api.projects.list();
@@ -98,7 +101,7 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setProjects(localList);
     setActiveProjectState((prev) => {
       if (prev && localList.find((p) => p.id === prev.id)) return prev;
-      return localList[0];
+      return localList[0] ?? DEFAULT_LOCAL_PROJECT;
     });
     setIsLoadingProjects(false);
   }, [isAuthenticated, isAuthLoading, isOfflineMode, loadLocalProjects]);

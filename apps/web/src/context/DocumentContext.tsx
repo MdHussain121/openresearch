@@ -260,7 +260,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   };
 
   const createDocument = async (title: string = ''): Promise<DocumentItem> => {
-    if (!activeProject) throw new Error('No active project');
     const projectId = activeProject.id;
 
     if (isAuthenticated && !isOfflineMode) {

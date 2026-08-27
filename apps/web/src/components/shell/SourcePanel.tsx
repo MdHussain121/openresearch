@@ -136,24 +136,16 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
     { id: 'cell', label: 'Cell Press' },
   ];
 
+  // Collapsed/expanded handled via width transition below
+
   return (
     <aside
-      className={`border-l border-border-default bg-surface flex flex-col shrink-0 overflow-visible contain-layout w-[var(--source-panel-width)] ${
-        isCollapsed ? 'translate-x-full' : 'translate-x-0'
-      }`}
-      style={{
-        transitionTimingFunction: 'var(--ease-smooth-out)',
-        transition: 'transform 250ms var(--ease-smooth-out)',
-      }}
+      className={`border-l border-border-default ${isCollapsed ? 'bg-sunken' : 'bg-surface'} flex flex-col shrink-0 overflow-visible contain-layout transition-[width,background-color] duration-250 ease-smooth-out ${isCollapsed ? 'w-[var(--source-panel-collapsed-width)] items-center py-4 cursor-pointer hover:bg-surface' : 'w-[var(--source-panel-width)]'}`}
+      onClick={isCollapsed ? onToggle : undefined}
+      title={isCollapsed ? "Expand Source Panel (Ctrl+\)" : undefined}
     >
-      <div className="flex flex-col flex-1 overflow-y-auto">
-      {/* Collapsed Indicator - absolutely positioned on left edge */}
-      {isCollapsed && (
-        <div
-          onClick={onToggle}
-          className="absolute left-[calc(-1*var(--source-panel-collapsed-width))] top-0 h-full w-[var(--source-panel-collapsed-width)] border-r border-border-default bg-sunken flex flex-col items-center py-4 cursor-pointer hover:bg-surface transition-[background-color,transform] duration-150 active:scale-[var(--scale-small)] shrink-0 select-none z-10"
-          title="Expand Source Panel (Ctrl+\)"
-        >
+      {isCollapsed ? (
+        <div className="flex flex-col items-center justify-between h-full py-4">
           <button className="p-1 text-text-tertiary hover:text-text-primary mb-6 focus-visible:ring-2 focus-visible:ring-accent rounded transition-transform duration-150 active:scale-90">
             <ChevronLeft className="w-4 h-4" />
           </button>
@@ -175,9 +167,10 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
             </div>
           </div>
         </div>
-      )}
+      ) : (
+        <div className="flex flex-col flex-1 overflow-y-auto">
 
-      {/* Panel Header */}
+        {/* Panel Header */}
       <div className="h-[var(--topbar-height)] border-b border-border-default px-4 flex items-center justify-between shrink-0 bg-surface">
         <div className="flex items-center space-x-2">
           <ShieldCheck className="w-4 h-4 text-accent" />
@@ -202,23 +195,23 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'source' | 'claims' | 'bibliography')} className="flex flex-col flex-1">
-        <TabsList className="w-full grid grid-cols-3 rounded-none border-b border-border-default bg-sunken/40 p-1">
-          <TabsTrigger value="source" className="text-xs py-1.5">
+        <TabsList className="w-full grid grid-cols-3 rounded-none border-b border-border-default bg-sunken/40 p-1 mb-2 relative z-10">
+          <TabsTrigger value="source" className="text-xs py-2 flex items-center justify-center">
             {t('sourcePanel.activeSource')}
           </TabsTrigger>
-          <TabsTrigger value="claims" className="text-xs py-1.5 flex items-center justify-center space-x-1">
+          <TabsTrigger value="claims" className="text-xs py-2 flex items-center justify-center space-x-1.5">
             <span>Claims</span>
             {unsupportedClaimsCount > 0 && (
-              <span className="text-[9px] font-mono px-1 py-0.2 rounded bg-trust-warning/20 text-trust-warning font-bold flex items-center gap-0.5">
+              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-trust-warning/20 text-trust-warning font-bold flex items-center gap-0.5">
                 <AlertTriangle className="w-2.5 h-2.5 text-trust-warning inline" />
                 <span>{unsupportedClaimsCount}</span>
               </span>
             )}
           </TabsTrigger>
-          <TabsTrigger value="bibliography" className="text-xs py-1.5 flex items-center justify-center space-x-1">
+          <TabsTrigger value="bibliography" className="text-xs py-2 flex items-center justify-center space-x-1.5">
             <span>{t('sourcePanel.bibliography')}</span>
             {citedReferences.length > 0 && (
-              <span className="text-[10px] font-mono px-1 py-0.2 rounded bg-surface border border-border-default">
+              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface border border-border-default">
                 {citedReferences.length}
               </span>
             )}
@@ -428,6 +421,7 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
         </div>
       </Tabs>
       </div>
+      )}
     </aside>
   );
 };

@@ -293,6 +293,11 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
         // Keep popover only while the '@' anchor is still intact directly behind the cursor
         if (typedText.startsWith('@') && !typedText.includes('\n')) {
           setCitationQuery(typedText.slice(1));
+          // Keep popover anchored to caret if it moves / scrolls
+          try {
+            const coords = currentEditor.view.coordsAtPos(currentPos);
+            setCitationCoords({ top: coords.bottom, left: coords.left });
+          } catch {}
         } else {
           setIsCitationPopoverOpen(false);
           setAtSymbolPos(null);

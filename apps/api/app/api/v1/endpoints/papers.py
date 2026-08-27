@@ -17,13 +17,13 @@ from fastapi import (
 from fastapi.responses import FileResponse
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_project_access
 from app.core.config import settings
 from app.core.constants import BYTES_PER_MB
 from app.core.database import get_db
 from app.models.annotation import PaperAnnotation
 from app.models.chunk import PaperChunk
 from app.models.paper import Paper
-from app.models.project import Project
 from app.models.user import User
 from app.schemas.models import (
     AnnotationCreate,
@@ -36,7 +36,7 @@ from app.schemas.models import (
     PaperResponse,
     PaperStatusResponse,
 )
-from app.services.auth import get_current_user, verify_user_access_to_owner
+from app.services.auth import get_current_user
 from app.services.pdf_extractor import PDFExtractionError, PDFValidator, pdf_extractor
 from app.services.rag_service import rag_service
 
@@ -64,6 +64,7 @@ async def upload_paper(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access(project_id, roles=["owner", "editor"])),
 ) -> Paper:
     """
     Upload and extract PDF paper:
@@ -73,22 +74,6 @@ async def upload_paper(
     4. Computes extraction confidence and status.
     5. Saves Paper record and extracted metadata.
     """
-
-    def _verify_access():
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-        if not verify_user_access_to_owner(
-            db, current_user.id, project.owner_id, required_roles=["owner", "editor"]
-        ):
-            raise HTTPException(
-                status_code=status.HTTP_403_FORBIDDEN,
-                detail="You do not have permission to upload papers to this project",
-            )
-        return project
-
-    await anyio.to_thread.run_sync(_verify_access)
 
     max_bytes = settings.MAX_UPLOAD_SIZE_MB * BYTES_PER_MB
     declared_length = request.headers.get("content-length")

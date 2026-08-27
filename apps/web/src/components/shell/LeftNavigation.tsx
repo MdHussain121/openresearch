@@ -61,16 +61,83 @@ export const LeftNavigation: React.FC<LeftNavigationProps> = ({
   const w = useWorkspace();
   const isSidebarCollapsed = w.isSidebarCollapsed;
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
+
+  if (isSidebarCollapsed) {
+    return (
+      <aside className="border-r border-border-default bg-sunken flex flex-col justify-between shrink-0 w-[var(--sidebar-collapsed-width)] transition-[width] duration-250 ease-smooth-out">
+        <nav className="space-y-1 p-1.5">
+          {NAV_ITEMS.map((item) => {
+            const isActive = pathname === NAV_ROUTES[item.nav];
+            return (
+              <button
+                key={item.nav}
+                onClick={() => router.push(NAV_ROUTES[item.nav])}
+                className={`w-full flex items-center justify-center py-2 text-xs rounded transition-[transform,background-color,border-color,color,box-shadow] duration-150 active:scale-[var(--scale-small)] ${
+                  isActive
+                    ? 'border-l-2 border-accent text-accent font-medium bg-surface/60'
+                    : 'text-text-secondary hover:text-text-primary hover:bg-surface/30'
+                }`}
+                title={item.title}
+              >
+                {item.icon}
+              </button>
+            );
+          })}
+        </nav>
+
+        <div className="pt-2 border-t border-border-default/60 space-y-1 p-1.5">
+          <button
+            onClick={onOpenPlugins}
+            className="w-full flex items-center justify-center py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+            title="Community Plugins"
+          >
+            <Boxes className="w-3.5 h-3.5 shrink-0 text-accent" />
+          </button>
+          <button
+            onClick={onOpenProviderQuota}
+            className="w-full flex items-center justify-center py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+            title="Provider Quotas & Status"
+          >
+            <Gauge className="w-3.5 h-3.5 shrink-0 text-accent" />
+          </button>
+          <button
+            onClick={onOpenZotero}
+            className="w-full flex items-center justify-center py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+            title="Zotero Sync & Import"
+          >
+            <FolderSync className="w-3.5 h-3.5 shrink-0 text-accent" />
+          </button>
+          <button
+            onClick={() => w.setIsSidebarCollapsed(!isSidebarCollapsed)}
+            className="w-full flex items-center justify-center py-1.5 text-xs text-text-tertiary hover:text-text-secondary rounded transition-[transform,background-color,color] duration-150 active:scale-[0.98]"
+            title="Expand Sidebar"
+          >
+            <PanelLeftOpen className="w-3.5 h-3.5" />
+          </button>
+        </div>
+
+        <ConfirmDialog
+          isOpen={pendingDeleteId !== null}
+          title={t('document.deleteDocument')}
+          description={t('document.deleteConfirm')}
+          onConfirm={() => {
+            if (pendingDeleteId) {
+              deleteDocument(pendingDeleteId);
+            }
+            setPendingDeleteId(null);
+          }}
+          onCancel={() => setPendingDeleteId(null)}
+        />
+      </aside>
+    );
+  }
+
   return (
     <aside
-      className={`border-r border-border-default bg-sunken flex flex-col justify-between shrink-0 contain-layout w-[var(--sidebar-width)]`}
+      className={`border-r border-border-default bg-sunken flex flex-col justify-between shrink-0 contain-layout w-[var(--sidebar-width)] transition-[width] duration-250 ease-smooth-out`}
     >
-      <div
-        className={`flex-1 overflow-hidden transition-transform duration-250 ease-smooth-out ${
-          isSidebarCollapsed ? 'translate-x-[calc(-100%+var(--sidebar-collapsed-width))]' : 'translate-x-0'
-        }`}
-      >
-        <div className={`space-y-4 ${isSidebarCollapsed ? 'p-1.5' : 'p-2'}`}>
+      <div className="flex-1 overflow-hidden">
+        <div className="space-y-4 p-2">
           {/* Nav Links */}
           <nav className="space-y-1">
             {NAV_ITEMS.map((item, idx) => {
@@ -80,10 +147,10 @@ export const LeftNavigation: React.FC<LeftNavigationProps> = ({
                   key={item.nav}
                   onClick={() => router.push(NAV_ROUTES[item.nav])}
                   style={!isSidebarCollapsed ? { animationDelay: `${Math.min(idx * 40, 240)}ms` } : undefined}
-                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} py-2 text-xs rounded transition-[transform,background-color,border-color,color,box-shadow] duration-150 active:scale-[var(--scale-small)] ${!isSidebarCollapsed ? 'animate-fade-slide-in' : ''} ${
+                  className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-3 px-3'} py-2 text-xs rounded transition-[transform,background-color,border-color,color,box-shadow] duration-150 active:scale-[var(--scale-small)] ${!isSidebarCollapsed ? 'animate-fade-slide-in' : ''} border-l-2 ${
                     isActive
-                      ? 'border-l-2 border-accent text-accent font-medium bg-surface/60'
-                      : 'text-text-secondary hover:text-text-primary hover:bg-surface/30'
+                      ? 'border-accent text-accent font-medium bg-surface/60'
+                      : 'border-transparent text-text-secondary hover:text-text-primary hover:bg-surface/30'
                   }`}
                   title={item.title}
                 >
@@ -166,48 +233,49 @@ export const LeftNavigation: React.FC<LeftNavigationProps> = ({
             </div>
           )}
 
-          {/* Sidebar Footer */}
-          <div className="pt-2 border-t border-border-default/60 space-y-1">
-            {/* Plugin Manager Trigger */}
-            <button
-              onClick={onOpenPlugins}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-2.5 px-3'} py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]`}
-              title="Community Plugins"
-            >
-              <Boxes className="w-3.5 h-3.5 shrink-0 text-accent" />
-              {!isSidebarCollapsed && <span>{t('plugins.title')}</span>}
-            </button>
-
-            {/* Provider Quota Trigger */}
-            <button
-              onClick={onOpenProviderQuota}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-2.5 px-3'} py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]`}
-              title="Provider Quotas & Status"
-            >
-              <Gauge className="w-3.5 h-3.5 shrink-0 text-accent" />
-              {!isSidebarCollapsed && <span>{t('providers.status')}</span>}
-            </button>
-
-            {/* Zotero Sync Trigger */}
-            <button
-              onClick={onOpenZotero}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-2.5 px-3'} py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]`}
-              title="Zotero Sync & Import"
-            >
-              <FolderSync className="w-3.5 h-3.5 shrink-0 text-accent" />
-              {!isSidebarCollapsed && <span>{t('zotero.sync')}</span>}
-            </button>
-
-            <button
-              onClick={() => w.setIsSidebarCollapsed(!isSidebarCollapsed)}
-              className={`w-full flex items-center ${isSidebarCollapsed ? 'justify-center px-0' : 'space-x-2.5 px-3'} py-1.5 text-xs text-text-tertiary hover:text-text-secondary rounded transition-[transform,background-color,color] duration-150 active:scale-[0.98]`}
-              title={isSidebarCollapsed ? 'Expand Sidebar' : 'Collapse Sidebar'}
-            >
-              {isSidebarCollapsed ? <PanelLeftOpen className="w-3.5 h-3.5" /> : <PanelLeftClose className="w-3.5 h-3.5" />}
-              {!isSidebarCollapsed && <span>{t('app.collapse')}</span>}
-            </button>
-          </div>
         </div>
+      </div>
+
+      {/* Sidebar Footer - fixed at bottom */}
+      <div className="px-2 pb-2 pt-2 border-t border-border-default/60 space-y-1 shrink-0">
+        {/* Plugin Manager Trigger */}
+        <button
+          onClick={onOpenPlugins}
+          className="w-full flex items-center space-x-2.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+          title="Community Plugins"
+        >
+          <Boxes className="w-3.5 h-3.5 shrink-0 text-accent" />
+          <span>{t('plugins.title')}</span>
+        </button>
+
+        {/* Provider Quota Trigger */}
+        <button
+          onClick={onOpenProviderQuota}
+          className="w-full flex items-center space-x-2.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+          title="Provider Quotas & Status"
+        >
+          <Gauge className="w-3.5 h-3.5 shrink-0 text-accent" />
+          <span>{t('providers.status')}</span>
+        </button>
+
+        {/* Zotero Sync Trigger */}
+        <button
+          onClick={onOpenZotero}
+          className="w-full flex items-center space-x-2.5 px-3 py-1.5 text-xs text-text-secondary hover:text-text-primary hover:bg-surface/40 rounded transition-[transform,background-color,color] duration-150 active:scale-[var(--scale-small)]"
+          title="Zotero Sync & Import"
+        >
+          <FolderSync className="w-3.5 h-3.5 shrink-0 text-accent" />
+          <span>{t('zotero.sync')}</span>
+        </button>
+
+        <button
+          onClick={() => w.setIsSidebarCollapsed(!isSidebarCollapsed)}
+          className="w-full flex items-center space-x-2.5 px-3 py-1.5 text-xs text-text-tertiary hover:text-text-secondary rounded transition-[transform,background-color,color] duration-150 active:scale-[0.98]"
+          title="Collapse Sidebar"
+        >
+          <PanelLeftClose className="w-3.5 h-3.5" />
+          <span>{t('app.collapse')}</span>
+        </button>
       </div>
 
       <ConfirmDialog

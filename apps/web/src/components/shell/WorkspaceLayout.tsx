@@ -6,6 +6,7 @@ import { useProject } from '../../context/ProjectContext';
 import { useDocument } from '../../context/DocumentContext';
 import { usePaper } from '../../context/PaperContext';
 import { useWorkspace } from '../../context/WorkspaceContext';
+import { useAuth } from '../../context/AuthContext';
 import { TopBar } from './TopBar';
 import { LeftNavigation } from './LeftNavigation';
 import { SourcePanel } from './SourcePanel';
@@ -35,6 +36,7 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
   } = useDocument();
   const { papers } = usePaper();
   const w = useWorkspace();
+  const { user, logout } = useAuth();
   const [isToastClosing, setIsToastClosing] = React.useState(false);
 
   // Handle toast close with exit animation
@@ -111,6 +113,7 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
           onOpenShortcuts={w.openShortcutsModal}
           onOpenNewProject={w.openProjectModal}
           onOpenTeams={w.openTeamModal}
+          onOpenAccount={() => alert(`Logged in as ${user?.email || 'unknown'}\n\nClick OK to sign out.`)}
         />
 
         {/* Main Workspace Layout (Sidebar + Content + Source Panel) */}
