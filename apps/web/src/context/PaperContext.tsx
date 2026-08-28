@@ -102,7 +102,7 @@ export interface PaperAnnotation {
   updated_at: string;
 }
 
-export type PipelineStep = 'upload' | 'extracting' | 'embeddings' | 'ready';
+export type PipelineStep = 'upload' | 'extracting' | 'ocr' | 'embeddings' | 'ready';
 
 export interface UploadProgress {
   isUploading: boolean;
@@ -110,6 +110,8 @@ export interface UploadProgress {
   step: PipelineStep;
   isUnverified?: boolean;
   error?: string;
+  ocrCurrentPage?: number;
+  ocrTotalPages?: number;
 }
 
 interface PaperContextType {
@@ -148,6 +150,24 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
+    // Local projects have no server backing — use offline store directly without noisy API 404
+    if (activeProject.id.startsWith('local-')) {
+      setIsLoading(true);
+      const localKey = `openresearch_local_papers_${activeProject.id}`;
+      const saved = localStorage.getItem(localKey);
+      if (saved) {
+        try {
+          setPapers(JSON.parse(saved));
+        } catch {
+          setPapers([]);
+        }
+      } else {
+        setPapers([]);
+      }
+      setIsLoading(false);
+      return;
+    }
+
     try {
       setIsLoading(true);
       const list = await api.papers.list(activeProject.id, searchQuery);
@@ -156,8 +176,8 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       try {
         localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(list));
       } catch {}
-    } catch (err) {
-      console.warn('Failed to load papers from server, using local fallback:', err);
+    } catch {
+      // Silent offline fallback — avoid spamming console with expected 404 when project not yet synced
       const localKey = `openresearch_local_papers_${activeProject.id}`;
       const saved = localStorage.getItem(localKey);
       if (saved) {
@@ -222,10 +242,20 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     try {
       setUploadProgress((prev) => prev ? { ...prev, step: 'extracting' } : null);
       const paper = await api.papers.upload(activeProject.id, file);
+      
+      // Poll for OCR progress if OCR was triggered
+      if (paper.extraction_status === 'unverified' && paper.metadata_json?.ocr_triggered) {
+        const totalPages = (paper.metadata_json as Record<string, unknown>).page_count as number ?? 0;
+        setUploadProgress((prev) => prev ? { ...prev, step: 'ocr', ocrCurrentPage: 0, ocrTotalPages: totalPages } : null);
+        await pollOcrProgress(paper.id);
+      }
+      
       setUploadProgress((prev) => prev ? {
         ...prev,
         step: 'ready',
         isUnverified: paper.extraction_status === 'unverified',
+        ocrCurrentPage: undefined,
+        ocrTotalPages: undefined,
       } : null);
       await loadPapers();
       return paper;
@@ -256,6 +286,29 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           error: err instanceof Error ? err.message : 'Upload failed',
         } : null);
         return null;
+      }
+    }
+  };
+
+  const pollOcrProgress = async (paperId: string): Promise<void> => {
+    const maxAttempts = 60; // 5 minutes max (5s intervals)
+    for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      try {
+        const status = await api.papers.getStatus(paperId);
+        if (status.step === 'ocr' && status.ocr_progress) {
+          const progress = status.ocr_progress as { current_page: number; total_pages: number };
+          setUploadProgress((prev) => prev ? {
+            ...prev,
+            ocrCurrentPage: progress.current_page ?? 0,
+            ocrTotalPages: progress.total_pages ?? 0,
+          } : null);
+        }
+        if (status.step === 'embeddings' || status.step === 'ready') {
+          break;
+        }
+        await new Promise(resolve => setTimeout(resolve, 5000)); // Poll every 5 seconds
+      } catch {
+        // Ignore polling errors, continue
       }
     }
   };

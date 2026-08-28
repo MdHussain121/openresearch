@@ -8,6 +8,7 @@ interface AIWritingFloatingOverlayProps {
   isContinuationOpen: boolean;
   isContinuationLoading: boolean;
   continuationText: string;
+  continuationError?: string | null;
   continuationGroundingState: GroundingState;
   continuationSources: GroundedPassage[];
   continuationLatency: number;
@@ -35,6 +36,7 @@ export const AIWritingFloatingOverlay: React.FC<AIWritingFloatingOverlayProps> =
   isContinuationOpen,
   isContinuationLoading,
   continuationText,
+  continuationError,
   continuationGroundingState,
   continuationSources,
   continuationLatency,
@@ -64,6 +66,7 @@ export const AIWritingFloatingOverlay: React.FC<AIWritingFloatingOverlayProps> =
         isOpen={isContinuationOpen}
         isLoading={isContinuationLoading}
         continuationText={continuationText}
+        error={continuationError}
         groundingState={continuationGroundingState}
         sources={continuationSources}
         latencyMs={continuationLatency}

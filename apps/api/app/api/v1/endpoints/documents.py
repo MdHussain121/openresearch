@@ -117,6 +117,10 @@ def delete_document(
     db: Session = Depends(get_db),
     document: Document = Depends(require_document_access),
 ) -> None:
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Viewers cannot delete documents")
     db.delete(document)
     db.commit()
     return

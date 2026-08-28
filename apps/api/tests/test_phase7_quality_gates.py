@@ -1,4 +1,4 @@
-"""Phase 7 quality-gate tests: closes coverage gaps in RAG chunking, teams,
+"""Phase 7 quality-gate tests: closes coverage gaps in RAG chunking,
 version history, Zotero dedup, and plugin service branches."""
 
 from fastapi.testclient import TestClient
@@ -204,11 +204,6 @@ def test_hybrid_search_modes_and_penalties(db: Session):
     )
 
 
-# ---------------------------------------------------------------------------
-# Teams endpoint error paths (teams.py lines 62, 95-107, 125-133, 157-166, ...)
-# ---------------------------------------------------------------------------
-
-
 def _register(client: TestClient, email: str) -> dict:
     res = client.post(
         "/api/v1/auth/register",
@@ -217,121 +212,6 @@ def _register(client: TestClient, email: str) -> dict:
     assert res.status_code in (200, 201), res.text
     token = res.json()["access_token"]
     return {"Authorization": f"Bearer {token}"}
-
-
-def test_teams_endpoint_error_paths(client: TestClient):
-    owner_headers = _register(client, "team_owner_gates@openresearch.org")
-    outsider_headers = _register(client, "team_outsider_gates@openresearch.org")
-
-    team = client.post(
-        "/api/v1/teams",
-        json={"name": "Quality Gate Team", "description": "Coverage"},
-        headers=owner_headers,
-    ).json()
-    team_id = team["id"]
-
-    # get_team: unknown id -> 404; non-member -> 403; member -> success
-    assert client.get("/api/v1/teams/nonexistent-team", headers=owner_headers).status_code == 404
-    assert client.get(f"/api/v1/teams/{team_id}", headers=outsider_headers).status_code == 403
-    ok = client.get(f"/api/v1/teams/{team_id}", headers=owner_headers)
-    assert ok.status_code == 200 and ok.json()["member_count"] == 1
-
-    # update_team: 404, forbidden role, and successful rename by owner
-    payload = {"name": "Renamed Team"}
-    assert (
-        client.patch(
-            "/api/v1/teams/nonexistent-team", json=payload, headers=owner_headers
-        ).status_code
-        == 404
-    )
-    assert (
-        client.patch(f"/api/v1/teams/{team_id}", json=payload, headers=outsider_headers).status_code
-        == 403
-    )
-    renamed = client.patch(f"/api/v1/teams/{team_id}", json=payload, headers=owner_headers)
-    assert renamed.status_code == 200 and renamed.json()["name"] == "Renamed Team"
-
-    # list_teams for user with no memberships -> empty list
-    empty_list = client.get("/api/v1/teams", headers=outsider_headers)
-    assert empty_list.status_code == 200 and empty_list.json() == []
-
-    # add member errors: missing user, duplicate membership; then success
-    assert (
-        client.post(
-            f"/api/v1/teams/{team_id}/members",
-            json={"email": "ghost_user@openresearch.org"},
-            headers=owner_headers,
-        ).status_code
-        == 404
-    )
-    client.post(
-        f"/api/v1/teams/{team_id}/members",
-        json={"email": "team_outsider_gates@openresearch.org", "role": "editor"},
-        headers=owner_headers,
-    )
-    dup = client.post(
-        f"/api/v1/teams/{team_id}/members",
-        json={"email": "team_outsider_gates@openresearch.org"},
-        headers=owner_headers,
-    )
-    assert dup.status_code == 409
-
-    members = client.get(f"/api/v1/teams/{team_id}/members", headers=owner_headers).json()
-    assert len(members) == 2
-    editor_entry = next(m for m in members if m["role"] == "editor")
-    assert (
-        client.get(f"/api/v1/teams/{team_id}/members", headers=outsider_headers).status_code == 200
-    )
-
-    # update member role errors: non-owner, unknown membership id
-    assert (
-        client.patch(
-            f"/api/v1/teams/{team_id}/members/{editor_entry['id']}",
-            json={"role": "viewer"},
-            headers=outsider_headers,
-        ).status_code
-        == 403
-    )
-    assert (
-        client.patch(
-            f"/api/v1/teams/{team_id}/members/nonexistent-membership",
-            json={"role": "viewer"},
-            headers=owner_headers,
-        ).status_code
-        == 404
-    )
-    promoted = client.patch(
-        f"/api/v1/teams/{team_id}/members/{editor_entry['id']}",
-        json={"role": "viewer"},
-        headers=owner_headers,
-    )
-    assert promoted.status_code == 200 and promoted.json()["role"] == "viewer"
-
-    # remove member errors and success
-    assert (
-        client.delete(
-            f"/api/v1/teams/{team_id}/members/nonexistent-membership", headers=owner_headers
-        ).status_code
-        == 404
-    )
-    assert (
-        client.delete(
-            f"/api/v1/teams/{team_id}/members/{editor_entry['id']}", headers=outsider_headers
-        ).status_code
-        == 403
-    )
-    assert (
-        client.delete(
-            f"/api/v1/teams/{team_id}/members/{editor_entry['id']}", headers=owner_headers
-        ).status_code
-        == 204
-    )
-
-    # delete_team: forbidden for non-owner, 404, then owner success
-    assert client.delete(f"/api/v1/teams/{team_id}", headers=outsider_headers).status_code == 403
-    assert client.delete("/api/v1/teams/ghost-team", headers=owner_headers).status_code == 404
-    assert client.delete(f"/api/v1/teams/{team_id}", headers=owner_headers).status_code == 204
-    assert client.get(f"/api/v1/teams/{team_id}", headers=owner_headers).status_code == 404
 
 
 # ---------------------------------------------------------------------------

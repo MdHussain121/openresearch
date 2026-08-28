@@ -44,6 +44,7 @@ export interface EditorActionHandlers {
     sources: GroundedPassage[];
   } | null>;
   onFocusChange?: (focused: boolean) => void;
+  onRegisterContinuationInserter?: (fn: (text: string) => boolean) => void;
 }
 
 export interface AcademicEditorProps extends EditorActionHandlers {

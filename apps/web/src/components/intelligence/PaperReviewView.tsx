@@ -7,6 +7,7 @@ import { api, PaperReviewResponseDTO, ReviewCategorySummaryDTO, ReviewIssueDTO }
 import { getErrorMessage } from '../../lib/errors';
 import { t } from '../../i18n';
 import { ViewHeader } from '../shell/ViewHeader';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@openresearch/ui';
 import {
   CheckCircle2,
   AlertCircle,
@@ -120,17 +121,18 @@ export const PaperReviewView: React.FC<PaperReviewViewProps> = ({ onClose }) => 
       <div className="flex items-center justify-between px-6 py-3 border-b border-border-default bg-sunken">
         <div className="flex items-center gap-3">
           <label className="text-xs font-semibold text-text-secondary">Document:</label>
-          <select
-            value={selectedDocId || activeDocument?.id || ''}
-            onChange={(e) => setSelectedDocId(e.target.value)}
-            className="text-xs px-3 py-1.5 rounded border border-border-default bg-surface text-text-primary focus:outline-none focus:border-accent"
-          >
-            {documents.map((d) => (
-              <option key={d.id} value={d.id}>
-                {d.title || 'Untitled Paper'}
-              </option>
-            ))}
-          </select>
+          <Select value={selectedDocId || activeDocument?.id || ''} onValueChange={setSelectedDocId}>
+            <SelectTrigger className="w-[200px] h-7 text-xs bg-surface">
+              <SelectValue placeholder="Select document" />
+            </SelectTrigger>
+            <SelectContent>
+              {documents.map((d) => (
+                <SelectItem key={d.id} value={d.id}>
+                  {d.title || 'Untitled Paper'}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
 
         <button
@@ -199,9 +201,9 @@ export const PaperReviewView: React.FC<PaperReviewViewProps> = ({ onClose }) => 
         {reviewResult && (
           <div className="flex-1 flex flex-col overflow-y-auto p-6 space-y-6">
             {/* Top Score Summary Banner */}
-            <div className="grid grid-cols-1 md:grid-cols-6 gap-4">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
               {/* Overall Score */}
-              <div className="md:col-span-1 p-4 rounded-lg bg-sunken border border-border-default flex flex-col items-center justify-center text-center">
+              <div className="col-span-2 sm:col-span-3 lg:col-span-1 p-4 rounded-lg bg-sunken border border-border-default flex flex-col items-center justify-center text-center">
                 <span className="text-[11px] font-semibold uppercase tracking-wider text-text-secondary">
                   Overall Health
                 </span>
@@ -273,15 +275,16 @@ export const PaperReviewView: React.FC<PaperReviewViewProps> = ({ onClose }) => 
 
               <div className="flex items-center gap-2 text-xs">
                 <span className="text-text-secondary">Severity:</span>
-                <select
-                  value={severityFilter}
-                  onChange={(e) => setSeverityFilter(e.target.value as any)}
-                  className="px-2 py-0.5 rounded border border-border-default bg-surface text-text-primary text-xs focus:outline-none"
-                >
-                  <option value="all">All Severities</option>
-                  <option value="warning">Warnings only</option>
-                  <option value="suggestion">Suggestions only</option>
-                </select>
+                <Select value={severityFilter} onValueChange={(v) => setSeverityFilter(v as SeverityFilter)}>
+                  <SelectTrigger className="w-[150px] h-6 text-xs bg-surface">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Severities</SelectItem>
+                    <SelectItem value="warning">Warnings only</SelectItem>
+                    <SelectItem value="suggestion">Suggestions only</SelectItem>
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 

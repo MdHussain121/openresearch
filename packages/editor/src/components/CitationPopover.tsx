@@ -105,13 +105,6 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
     setSelectedIndex(0);
   }, [query, filteredPapers.length]);
 
-  // Auto-focus the container when opened
-  useEffect(() => {
-    if (isOpen && containerRef.current) {
-      containerRef.current.focus();
-    }
-  }, [isOpen]);
-
   // Outside-click dismiss
   useEffect(() => {
     if (!isOpen) return;
@@ -126,16 +119,11 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
     return () => document.removeEventListener('mousedown', handleMouseDown);
   }, [isOpen, onClose]);
 
-  // Keyboard navigation handler (scoped to container)
+  // Keyboard navigation handler for seamless inline typing
   useEffect(() => {
     if (!isOpen) return;
 
-    const container = containerRef.current;
-    if (!container) return;
-
     const handleKeyDown = (e: KeyboardEvent) => {
-      if (!container.contains(e.target as Node)) return;
-
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setSelectedIndex((prev) => (prev + 1) % Math.max(1, filteredPapers.length));
@@ -143,8 +131,8 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
         e.preventDefault();
         setSelectedIndex((prev) => (prev - 1 + filteredPapers.length) % Math.max(1, filteredPapers.length));
       } else if (e.key === 'Enter') {
-        e.preventDefault();
         if (filteredPapers.length > 0 && filteredPapers[selectedIndex]) {
+          e.preventDefault();
           onSelect(filteredPapers[selectedIndex]);
         }
       } else if (e.key === 'Escape') {
@@ -153,8 +141,8 @@ export const CitationPopover: React.FC<CitationPopoverProps> = ({
       }
     };
 
-    container.addEventListener('keydown', handleKeyDown);
-    return () => container.removeEventListener('keydown', handleKeyDown);
+    window.addEventListener('keydown', handleKeyDown, true);
+    return () => window.removeEventListener('keydown', handleKeyDown, true);
   }, [isOpen, filteredPapers, selectedIndex, onSelect, onClose]);
 
   if (!isOpen) return null;

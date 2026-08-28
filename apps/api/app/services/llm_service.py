@@ -214,6 +214,9 @@ class LLMService:
             if not isinstance(text, str):
                 return None
             cleaned = text.replace("<|fim_middle|>", "").replace("<|endoftext|>", "").strip()
+            # An "empty" completion (Tabby echoes a bare newline when the prefix
+            # already sits on a sentence boundary) is treated as no answer so
+            # callers can retry with a trimmed prefix rather than insert nothing.
             return cleaned or None
         except Exception as exc:
             logger.warning("Tabby generation failed: %s", exc)

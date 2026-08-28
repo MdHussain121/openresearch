@@ -50,9 +50,13 @@ class FakeResponse:
 
 
 @pytest.fixture(autouse=True)
-def default_tabby_env(monkeypatch):
+def default_tabby_env(monkeypatch, tmp_path):
     monkeypatch.setattr(settings, "TABBY_BASE_URL", "http://localhost:8080")
     monkeypatch.setattr(settings, "TABBY_MODEL", "Qwen2.5-Coder-1.5B")
+    store_file = tmp_path / "provider_keys.json"
+    monkeypatch.setattr(provider_settings, "_store_path", lambda: store_file)
+    monkeypatch.setattr(provider_settings, "_candidate_store_paths", lambda: [store_file])
+    llm_module.llm_service._tabby_probe_cache = None
 
 
 def fresh_service():

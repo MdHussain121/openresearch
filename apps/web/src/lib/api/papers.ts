@@ -42,6 +42,11 @@ export interface PaperStatusDTO {
   extraction_status: ExtractionStatus;
   chunks_count?: number;
   annotations_count: number;
+  step?: 'upload' | 'extracting' | 'ocr' | 'embeddings' | 'ready';
+  ocr_progress?: {
+    current_page: number;
+    total_pages: number;
+  };
 }
 
 export const papersApi = {
@@ -70,6 +75,7 @@ export const papersApi = {
     return response.json();
   },
   status: (id: string) => request<PaperStatusDTO>(`/papers/${id}/status`),
+  getStatus: (id: string) => request<PaperStatusDTO>(`/papers/${id}/status`),
   delete: (id: string) =>
     request<void>(`/papers/${id}`, {
       method: 'DELETE',

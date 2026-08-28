@@ -64,8 +64,8 @@ export const layout = {
   topbarHeight: '48px',
   sidebarWidth: '220px',
   sidebarCollapsedWidth: '56px',
-  editorMaxWidth: '720px',
-  sourcePanelWidth: '320px',
+  editorMaxWidth: '960px',
+  sourcePanelWidth: '340px',
   sourcePanelCollapsedWidth: '32px',
 } as const;
 

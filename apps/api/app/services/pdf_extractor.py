@@ -20,7 +20,7 @@ from app.services.pdf import (
     TeiParser,
     pdf_extractor,
 )
-from app.services.pdf.pdfplumber_extractor import MATH_SYMBOLS, SECTION_PATTERNS
+from app.services.pdf.base_extractor import MATH_SYMBOLS, SECTION_PATTERNS
 
 # Backward compat alias - tests import PDFExtractorService
 PDFExtractorService = PDFExtractor

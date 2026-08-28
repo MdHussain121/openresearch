@@ -12,6 +12,13 @@ if "%ROOT_DIR:~-1%"=="\" set "ROOT_DIR=%ROOT_DIR:~0,-1%"
 set "VENV_DIR=%ROOT_DIR%\apps\api\.venv"
 set "PY_EXE=%VENV_DIR%\Scripts\python.exe"
 
+if /i "%~1"=="desktop" goto DESKTOP_MODE
+if /i "%~1"=="-d" goto DESKTOP_MODE
+if /i "%~1"=="--desktop" goto DESKTOP_MODE
+if /i "%~1"=="web" goto FULL_STACK_MODE
+if /i "%~1"=="api" goto BACKEND_ONLY_MODE
+if /i "%~1"=="test" goto TEST_MODE
+
 :MENU
 cls
 echo ===============================================================================
@@ -20,10 +27,14 @@ echo ===========================================================================
 echo.
 echo   Please select an option to launch the application:
 echo.
-echo   [1] Start Full Stack (Recommended)
+echo   [1] Start Full Stack (Web Browser)
 echo       * Auto-installs missing dependencies [npm and python]
 echo       * Launches FastAPI Backend [8000] and Next.js Frontend [3000]
 echo       * Opens http://localhost:3000 in your default web browser
+echo.
+echo   [D] Desktop App Mode (Electron Window)
+echo       * Launches FastAPI Backend [8000] and Next.js Frontend [3000]
+echo       * Opens standalone Electron Desktop Window with Custom Themed Title Bar
 echo.
 echo   [2] Backend API Only (FastAPI on port 8000)
 echo       * Interactive Swagger docs at http://localhost:8000/api/v1/docs
@@ -42,8 +53,9 @@ echo   [7] Exit
 echo.
 echo ===============================================================================
 set "CHOICE=1"
-set /p "CHOICE=Enter choice [1-7] (Default: 1): "
+set /p "CHOICE=Enter choice [1-7 or D] (Default: 1): "
 
+if /i "%CHOICE%"=="D" goto DESKTOP_MODE
 if "%CHOICE%"=="1" goto FULL_STACK_MODE
 if "%CHOICE%"=="2" goto BACKEND_ONLY_MODE
 if "%CHOICE%"=="3" goto FRONTEND_ONLY_MODE
@@ -53,7 +65,7 @@ if "%CHOICE%"=="6" goto CLEAN_PORTS
 if "%CHOICE%"=="7" goto EXIT_SCRIPT
 
 echo.
-echo [!] Invalid selection "%CHOICE%". Please enter 1, 2, 3, 4, 5, 6, or 7.
+echo [!] Invalid selection "%CHOICE%". Please enter 1, 2, 3, 4, 5, 6, 7, or D.
 echo.
 pause
 goto MENU
@@ -163,6 +175,16 @@ goto :eof
 
 
 :: ===============================================================================
+:: OPTION D: DESKTOP APP MODE (ELECTRON)
+:: ===============================================================================
+:DESKTOP_MODE
+call :CHECK_DEPS
+call :START_BACKEND
+call :START_FRONTEND
+call :START_DESKTOP
+goto SERVICE_DASHBOARD
+
+:: ===============================================================================
 :: OPTION 1: FULL STACK MODE
 :: ===============================================================================
 :FULL_STACK_MODE
@@ -208,6 +230,12 @@ goto :eof
 :START_FRONTEND
 echo   -> Starting Next.js Web App on http://localhost:3000 ...
 start "OpenResearch - Next.js Web (:3000)" /D "%ROOT_DIR%\apps\web" cmd /k "title OpenResearch - Next.js Web (:3000) && npm run dev"
+ping -n 3 127.0.0.1 >nul 2>&1
+goto :eof
+
+:START_DESKTOP
+echo   -> Launching Electron Desktop Window...
+start "OpenResearch - Electron Desktop" /D "%ROOT_DIR%" cmd /k "title OpenResearch - Desktop && npm run dev:desktop"
 ping -n 3 127.0.0.1 >nul 2>&1
 goto :eof
 

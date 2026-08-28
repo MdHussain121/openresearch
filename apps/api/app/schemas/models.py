@@ -128,14 +128,6 @@ from app.schemas.system import (
     ProviderQuotaResponse,
     ProviderStatusItem,
 )
-from app.schemas.teams import (
-    TeamCreate,
-    TeamMemberAdd,
-    TeamMemberResponse,
-    TeamMemberUpdate,
-    TeamResponse,
-    TeamUpdate,
-)
 from app.schemas.versions import (
     VersionCreate,
     VersionDiffItem,
@@ -239,12 +231,6 @@ __all__ = [
     "ResetPasswordResponse",
     "ReviewCategorySummarySchema",
     "ReviewIssueSchema",
-    "TeamCreate",
-    "TeamMemberAdd",
-    "TeamMemberResponse",
-    "TeamMemberUpdate",
-    "TeamResponse",
-    "TeamUpdate",
     "Token",
     "TokenData",
     "TokenRefreshRequest",

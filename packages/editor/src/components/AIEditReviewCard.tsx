@@ -82,13 +82,8 @@ export const AIEditReviewCard: React.FC<AIEditReviewCardProps> = ({
     <>
       <div className="fixed inset-0 z-40 bg-black/5 animate-in fade-in duration-150" aria-hidden="true" />
       <div
-        className="fixed bottom-12 right-12 z-50 w-[460px] max-w-[calc(100vw-48px)] rounded-lg border border-border-default bg-surface shadow-2xl overflow-hidden font-sans text-xs transition-[transform,opacity] duration-250 ease-smooth-out data-[state=closing]:duration-150 data-[state=closing]:ease-in"
+        className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-12 sm:right-12 z-50 w-auto sm:w-[460px] sm:max-w-lg rounded-lg border border-border-default bg-surface shadow-2xl overflow-hidden font-sans text-xs animate-in fade-in slide-in-from-bottom-4 duration-250 ease-smooth-out data-[state=closing]:animate-out data-[state=closing]:fade-out data-[state=closing]:slide-out-to-bottom-4 data-[state=closing]:duration-150 will-change-transform data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-bottom-4"
         data-state={isClosing ? 'closing' : 'open'}
-        style={{
-          transitionProperty: 'transform, opacity',
-          transitionDuration: 'var(--duration-emphasis), var(--duration-emphasis)',
-          transitionTimingFunction: 'var(--ease-smooth-out), var(--ease-smooth-out)',
-        }}
       >
       {/* Header Bar */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-sunken border-b border-border-default">

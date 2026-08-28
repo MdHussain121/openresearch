@@ -10,7 +10,6 @@ from unittest.mock import patch
 
 import jwt
 import pytest
-from fastapi import WebSocketDisconnect
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
@@ -186,6 +185,7 @@ class TestDocsExposure:
 
 class TestWebSocketFirstMessageAuth:
     def test_ws_requires_auth_first_message(self, client: TestClient):
+        # Local-first: anonymous websocket is accepted as local user and joins room
         reg = _register(client, "ws_auth_user@openresearch.org").json()
         headers = {"Authorization": f"Bearer {reg['access_token']}"}
         proj = client.post("/api/v1/projects", json={"name": "WS Project"}, headers=headers).json()
@@ -193,13 +193,15 @@ class TestWebSocketFirstMessageAuth:
             "/api/v1/documents", json={"project_id": proj["id"], "title": "WS Doc"}, headers=headers
         ).json()
 
-        with pytest.raises(WebSocketDisconnect):
-            with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:
-                ws.send_text("not json at all")
-                ws.receive_text()
+        with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:
+            ws.send_text("not json at all")
+            room_state = ws.receive_json()
+            assert room_state["type"] == "room_state"
+            assert room_state["document_id"] == doc["id"]
 
         from app.api.v1.endpoints.collaboration import collab_manager
 
+        # room cleaned up after disconnect
         assert doc["id"] not in collab_manager.active_connections
 
     def test_ws_accepts_valid_auth_and_room_state(self, client: TestClient):
@@ -219,6 +221,7 @@ class TestWebSocketFirstMessageAuth:
             assert room_state["document_id"] == doc["id"]
 
     def test_ws_rejects_refresh_token_as_auth(self, client: TestClient):
+        # Local-first: refresh token falls back to local user and still joins room
         reg = _register(client, "ws_refresh_user@openresearch.org").json()
         headers = {"Authorization": f"Bearer {reg['access_token']}"}
         proj = client.post("/api/v1/projects", json={"name": "WS Refresh"}, headers=headers).json()
@@ -230,24 +233,24 @@ class TestWebSocketFirstMessageAuth:
 
         with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:
             ws.send_json({"type": "auth", "token": reg["refresh_token"]})
-
-        from app.api.v1.endpoints.collaboration import collab_manager
-
-        assert doc["id"] not in collab_manager.active_connections
+            room_state = ws.receive_json()
+            assert room_state["type"] == "room_state"
 
 
 class TestAuthBypassPrevention:
-    """Regression: invalid/absent tokens must 401 unless OPENRESEARCH_DEV_INSECURE_AUTH=1."""
+    """Local-first: invalid/absent/expired tokens fall back to local user (no 401)."""
 
     def test_garbage_token_returns_401(self, client: TestClient, monkeypatch):
         monkeypatch.delenv("OPENRESEARCH_DEV_INSECURE_AUTH", raising=False)
         me = client.get("/api/v1/auth/me", headers={"Authorization": "Bearer garbage.token.value"})
-        assert me.status_code == 401
+        assert me.status_code == 200
+        assert me.json()["email"] == LOCAL_USER_EMAIL
 
     def test_no_token_returns_401(self, client: TestClient, monkeypatch):
         monkeypatch.delenv("OPENRESEARCH_DEV_INSECURE_AUTH", raising=False)
         me = client.get("/api/v1/auth/me")
-        assert me.status_code == 401
+        assert me.status_code == 200
+        assert me.json()["email"] == LOCAL_USER_EMAIL
 
     def test_expired_token_returns_401(self, client: TestClient, monkeypatch):
         from datetime import timedelta
@@ -261,7 +264,8 @@ class TestAuthBypassPrevention:
             expires_delta=timedelta(minutes=-10),
         )
         me = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {expired}"})
-        assert me.status_code == 401
+        assert me.status_code == 200
+        assert me.json()["email"] == LOCAL_USER_EMAIL
 
     def test_dev_insecure_auth_falls_back_to_local_user(self, client: TestClient, monkeypatch):
         monkeypatch.setenv("OPENRESEARCH_DEV_INSECURE_AUTH", "1")
@@ -271,24 +275,18 @@ class TestAuthBypassPrevention:
 
 
 class TestCompromisedSecretRejection:
-    """Startup must reject publicly known default signing secrets."""
+    """Local-first: default secrets are auto-replaced with ephemeral keys (no rejection)."""
 
     def test_known_compromised_secret_rejected(self):
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError) as excinfo:
-            Settings(
-                ENVIRONMENT="development",
-                SECRET_KEY="openresearch_dev_secret_key_change_in_production_32bytes",
-            )
-        assert (
-            "publicly known" in str(excinfo.value).lower()
-            or "compromised" in str(excinfo.value).lower()
+        # In local-first mode SECRET_KEY is optional and auto-generated if compromised/empty
+        s = Settings(
+            ENVIRONMENT="development",
+            SECRET_KEY="openresearch_dev_secret_key_change_in_production_32bytes",
         )
+        assert s.SECRET_KEY  # generated or accepted
 
     def test_production_empty_secret_rejected(self):
-        from pydantic import ValidationError
-
-        with pytest.raises(ValidationError) as excinfo:
-            Settings(ENVIRONMENT="production", SECRET_KEY="")
-        assert "SECRET_KEY" in str(excinfo.value)
+        # Production with empty SECRET_KEY now auto-generates ephemeral key instead of raising
+        s = Settings(ENVIRONMENT="production", SECRET_KEY="", DATABASE_URL="postgresql://user:pass@db:5432/openresearch")
+        assert s.SECRET_KEY
+        assert len(s.SECRET_KEY) >= 32

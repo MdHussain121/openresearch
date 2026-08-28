@@ -1,0 +1,31 @@
+appId: org.openresearch.desktop
+productName: OpenResearch
+copyright: Copyright © 2026 OpenResearch Contributors
+directories:
+  output: release
+  buildResources: build
+files:
+  - dist/**/*
+  - package.json
+win:
+  target:
+    - target: nsis
+      arch:
+        - x64
+    - target: portable
+      arch:
+        - x64
+mac:
+  target:
+    - default
+  category: public.app-category.education
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Office
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  createStartMenuShortcut: true

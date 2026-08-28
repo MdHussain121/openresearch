@@ -25,6 +25,9 @@ import {
   Search
 } from 'lucide-react';
 import { ViewHeader } from '../shell/ViewHeader';
+import { copyWithFallback } from '../../lib/clipboard';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue, Tooltip, TooltipTrigger, TooltipContent } from '@openresearch/ui';
+import { CITATION_STYLES } from '../../lib/citationStyles';
 
 interface CitationsManagerProps {
   onOpenAddByIdentifier: () => void;
@@ -46,6 +49,7 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [librarySearch, setLibrarySearch] = useState('');
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
 
   // Map document citations to BibliographicReference objects
   const citedReferences: BibliographicReference[] = useMemo(() => {
@@ -83,18 +87,28 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
     return generateBibliography(citedReferences, citationStyle);
   }, [citedReferences, citationStyle]);
 
-  const handleCopyAll = () => {
+  const handleCopyAll = async () => {
     if (formattedBibliography.length === 0) return;
     const text = formattedBibliography.map((f) => f.bibliographyEntry).join('\n\n');
-    navigator.clipboard.writeText(text);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
+    const ok = await copyWithFallback(text);
+    if (ok) {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    } else {
+      setCopyFallback('Copy failed. Please select and copy manually.');
+      setTimeout(() => setCopyFallback(null), 3000);
+    }
   };
 
-  const handleCopySingle = (refId: string, entryText: string) => {
-    navigator.clipboard.writeText(entryText);
-    setCopiedId(refId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopySingle = async (refId: string, entryText: string) => {
+    const ok = await copyWithFallback(entryText);
+    if (ok) {
+      setCopiedId(refId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } else {
+      setCopyFallback('Copy failed. Please select and copy manually.');
+      setTimeout(() => setCopyFallback(null), 3000);
+    }
   };
 
   const filteredLibraryPapers = useMemo(() => {
@@ -107,34 +121,7 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
     });
   }, [papers, librarySearch]);
 
-  const styleOptions: Array<{ id: CitationStyle; label: string }> = [
-    { id: 'apa', label: t('citations.styles.apa') },
-    { id: 'mla', label: t('citations.styles.mla') },
-    { id: 'chicago', label: t('citations.styles.chicago') },
-    { id: 'chicago-notes', label: t('citations.styles.chicagoNotes') },
-    { id: 'ieee', label: t('citations.styles.ieee') },
-    { id: 'harvard', label: t('citations.styles.harvard') },
-    { id: 'vancouver', label: t('citations.styles.vancouver') },
-    { id: 'nature', label: t('citations.styles.nature') },
-    { id: 'science', label: t('citations.styles.science') },
-    { id: 'acm', label: t('citations.styles.acm') },
-    { id: 'acs', label: t('citations.styles.acs') },
-    { id: 'turabian', label: t('citations.styles.turabian') },
-    { id: 'ama', label: t('citations.styles.ama') },
-    { id: 'nlm', label: t('citations.styles.nlm') },
-    { id: 'cse', label: t('citations.styles.cse') },
-    { id: 'apsa', label: t('citations.styles.apsa') },
-    { id: 'asa', label: t('citations.styles.asa') },
-    { id: 'aaa', label: t('citations.styles.aaa') },
-    { id: 'mhra', label: t('citations.styles.mhra') },
-    { id: 'oxford', label: t('citations.styles.oxford') },
-    { id: 'oscola', label: t('citations.styles.oscola') },
-    { id: 'bluebook', label: t('citations.styles.bluebook') },
-    { id: 'abnt', label: t('citations.styles.abnt') },
-    { id: 'iso690', label: t('citations.styles.iso690') },
-    { id: 'gbt7714', label: t('citations.styles.gbt7714') },
-    { id: 'cell', label: t('citations.styles.cell') },
-  ];
+  const styleOptions = CITATION_STYLES.map((s) => ({ id: s.id, label: t(s.labelKey) }));
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-canvas">
@@ -150,17 +137,18 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
               <span className="font-semibold text-text-secondary text-[11px] uppercase tracking-wider">
                 {t('citations.style')}:
               </span>
-              <select
-                value={citationStyle}
-                onChange={(e) => setCitationStyle(e.target.value as CitationStyle)}
-                className="bg-transparent text-text-primary font-medium focus:outline-none cursor-pointer"
-              >
-                {styleOptions.map((opt) => (
-                  <option key={opt.id} value={opt.id}>
-                    {opt.label}
-                  </option>
-                ))}
-              </select>
+              <Select value={citationStyle} onValueChange={(v) => setCitationStyle(v as CitationStyle)}>
+                <SelectTrigger className="w-auto min-w-[140px] h-6 border-0 bg-transparent px-1 py-0 text-xs font-medium shadow-none focus:ring-0">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {styleOptions.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {opt.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
 
             <button
@@ -227,6 +215,12 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
           )}
         </div>
 
+        {copyFallback && (
+          <div role="alert" className="p-2 rounded border border-trust-warning/30 bg-trust-warning/10 text-xs text-trust-warning">
+            {copyFallback}
+          </div>
+        )}
+
         {formattedBibliography.length > 0 ? (
           <div className="p-5 rounded-lg border border-border-default bg-surface shadow-2xs space-y-4 divide-y divide-border-default/40">
             {formattedBibliography.map((item, idx) => (
@@ -245,17 +239,21 @@ export const CitationsManager: React.FC<CitationsManagerProps> = ({
                   </p>
                 </div>
 
-                <button
-                  onClick={() => handleCopySingle(item.referenceId, item.bibliographyEntry)}
-                  className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary transition-[opacity,background-color,color]"
-                  title="Copy reference entry"
-                >
-                  {copiedId === item.referenceId ? (
-                    <Check className="w-3.5 h-3.5 text-trust-grounded" />
-                  ) : (
-                    <Copy className="w-3.5 h-3.5" />
-                  )}
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={() => handleCopySingle(item.referenceId, item.bibliographyEntry)}
+                      className="opacity-0 group-hover:opacity-100 p-1.5 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary transition-[opacity,background-color,color]"
+                    >
+                      {copiedId === item.referenceId ? (
+                        <Check className="w-3.5 h-3.5 text-trust-grounded" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>Copy reference entry</TooltipContent>
+                </Tooltip>
               </div>
             ))}
           </div>

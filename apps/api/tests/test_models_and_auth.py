@@ -63,35 +63,6 @@ def test_user_creation_with_polymorphic_owner_and_membership(db_session):
     assert unauthorized is False
 
 
-def test_team_owner_and_membership_role_model(db_session):
-    # Setup user
-    user = create_user_with_personal_owner(
-        db=db_session, email="pi@lab.org", password="SecurePassword123", name="Prof. Jordan"
-    )
-
-    # Create a team owner (Phase 3-ready data model)
-    team_owner = Owner(owner_type="team")
-    db_session.add(team_owner)
-    db_session.flush()
-
-    # Add user as editor to team
-    team_membership = Membership(owner_id=team_owner.id, user_id=user.id, role="editor")
-    db_session.add(team_membership)
-    db_session.commit()
-
-    assert verify_user_access_to_owner(db_session, user.id, team_owner.id) is True
-    assert (
-        verify_user_access_to_owner(
-            db_session, user.id, team_owner.id, required_roles=["editor", "owner"]
-        )
-        is True
-    )
-    assert (
-        verify_user_access_to_owner(db_session, user.id, team_owner.id, required_roles=["owner"])
-        is False
-    )
-
-
 def test_paper_extraction_status_and_citation_attribution_scope(db_session):
     user = create_user_with_personal_owner(
         db=db_session, email="student@mit.edu", password="SecurePassword123", name="Sam Taylor"

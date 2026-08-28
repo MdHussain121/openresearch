@@ -132,7 +132,7 @@ export const PluginManagerModal: React.FC<PluginManagerModalProps> = ({
         </DialogHeader>
 
         {/* Content */}
-        <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-y-auto md:overflow-hidden">
           {/* Left: Plugin List */}
           <div className="border-r border-border-default bg-sunken/20 p-4 flex flex-col gap-2 overflow-y-auto">
             <div className="flex items-center justify-between mb-1">

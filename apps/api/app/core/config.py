@@ -85,6 +85,16 @@ class Settings(BaseSettings):
     # GROBID Settings (supports both GROBID_URL and GROBID_HOST)
     GROBID_URL: str = "http://localhost:8070"
 
+    # Semantic Scholar
+    SEMANTIC_SCHOLAR_API_KEY: str | None = None
+    SEMANTIC_SCHOLAR_RPS: float = 1.0
+
+    # OCR Settings
+    OCR_ENABLED: bool = True
+    OCR_DPI: int = 300
+    OCR_LANG: str = "eng"
+    OCR_THRESHOLD_CHARS_PER_PAGE: int = 150
+
     # LLM Settings (supports both OLLAMA_BASE_URL and OLLAMA_HOST)
     OLLAMA_BASE_URL: str = "http://localhost:11434"
     OLLAMA_MODEL: str = "llama3.2:3b"

@@ -32,7 +32,7 @@ import {
 
 import type { GroundedPassage } from '@openresearch/ai';
 import { ViewHeader } from '../shell/ViewHeader';
-import { Tabs, TabsList, TabsTrigger } from '@openresearch/ui';
+import { Tabs, TabsList, TabsTrigger, Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@openresearch/ui';
 export type { GroundedPassage };
 
 export type ChatMode = 'document' | 'library' | 'project' | 'general';
@@ -331,17 +331,18 @@ export const AiResearchChat: React.FC<AiResearchChatProps> = ({
           <div className="flex items-center space-x-2 text-xs pt-1">
             <span className="text-text-tertiary shrink-0 font-medium">{t('chat.selectPaper')}:</span>
             {papers.length > 0 ? (
-              <select
-                value={selectedPaperId}
-                onChange={(e) => setSelectedPaperId(e.target.value)}
-                className="flex-1 px-2 py-1 text-xs rounded border border-border-default bg-sunken text-text-primary truncate focus:outline-none focus:border-accent"
-              >
-                {papers.map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.title} ({p.year || 'n.d.'})
-                  </option>
-                ))}
-              </select>
+              <Select value={selectedPaperId} onValueChange={setSelectedPaperId}>
+                <SelectTrigger className="flex-1 h-7 text-xs bg-sunken">
+                  <SelectValue placeholder="Select paper" />
+                </SelectTrigger>
+                <SelectContent>
+                  {papers.map((p) => (
+                    <SelectItem key={p.id} value={p.id}>
+                      {p.title} ({p.year || 'n.d.'})
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             ) : (
               <span className="text-xs text-text-tertiary italic">No papers in project yet. Upload a PDF first.</span>
             )}

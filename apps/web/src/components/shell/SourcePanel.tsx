@@ -18,6 +18,7 @@ import {
 import { GroundedPassage } from '../chat/AiResearchChat';
 import { useDocument } from '../../context/DocumentContext';
 import { usePaper } from '../../context/PaperContext';
+import { copyWithFallback } from '../../lib/clipboard';
 import {
   CitationStyle,
   BibliographicReference,
@@ -29,7 +30,16 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
+  Tooltip,
+  TooltipTrigger,
+  TooltipContent,
 } from '@openresearch/ui';
+import { CITATION_STYLES } from '../../lib/citationStyles';
 
 interface SourcePanelProps {
   isCollapsed: boolean;
@@ -58,6 +68,7 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
   const [activeTab, setActiveTab] = useState<'source' | 'claims' | 'bibliography'>('source');
   const [copiedAll, setCopiedAll] = useState(false);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
 
   // Map cited document citations to BibliographicReference objects
   const citedReferences: BibliographicReference[] = useMemo(() => {
@@ -93,48 +104,31 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
     return generateBibliography(citedReferences, citationStyle);
   }, [citedReferences, citationStyle]);
 
-  const handleCopyAll = () => {
+  const handleCopyAll = async () => {
     if (formattedBibliography.length === 0) return;
     const text = formattedBibliography.map((f) => f.bibliographyEntry).join('\n\n');
-    navigator.clipboard.writeText(text);
-    setCopiedAll(true);
-    setTimeout(() => setCopiedAll(false), 2000);
+    const ok = await copyWithFallback(text);
+    if (ok) {
+      setCopiedAll(true);
+      setTimeout(() => setCopiedAll(false), 2000);
+    } else {
+      setCopyFallback('Copy failed. Please select and copy manually.');
+      setTimeout(() => setCopyFallback(null), 3000);
+    }
   };
 
-  const handleCopySingle = (refId: string, entryText: string) => {
-    navigator.clipboard.writeText(entryText);
-    setCopiedId(refId);
-    setTimeout(() => setCopiedId(null), 2000);
+  const handleCopySingle = async (refId: string, entryText: string) => {
+    const ok = await copyWithFallback(entryText);
+    if (ok) {
+      setCopiedId(refId);
+      setTimeout(() => setCopiedId(null), 2000);
+    } else {
+      setCopyFallback('Copy failed. Please select and copy manually.');
+      setTimeout(() => setCopyFallback(null), 3000);
+    }
   };
 
-  const styleOptions: Array<{ id: CitationStyle; label: string }> = [
-    { id: 'apa', label: 'APA 7th' },
-    { id: 'mla', label: 'MLA 9th' },
-    { id: 'chicago', label: 'Chicago 17th' },
-    { id: 'chicago-notes', label: 'Chicago Notes' },
-    { id: 'ieee', label: 'IEEE' },
-    { id: 'harvard', label: 'Harvard' },
-    { id: 'vancouver', label: 'Vancouver' },
-    { id: 'nature', label: 'Nature' },
-    { id: 'science', label: 'Science' },
-    { id: 'acm', label: 'ACM' },
-    { id: 'acs', label: 'ACS' },
-    { id: 'turabian', label: 'Turabian 9th' },
-    { id: 'ama', label: 'AMA 11th' },
-    { id: 'nlm', label: 'NLM' },
-    { id: 'cse', label: 'CSE' },
-    { id: 'apsa', label: 'APSA' },
-    { id: 'asa', label: 'ASA' },
-    { id: 'aaa', label: 'AAA' },
-    { id: 'mhra', label: 'MHRA' },
-    { id: 'oxford', label: 'Oxford' },
-    { id: 'oscola', label: 'OSCOLA' },
-    { id: 'bluebook', label: 'Bluebook' },
-    { id: 'abnt', label: 'ABNT' },
-    { id: 'iso690', label: 'ISO 690' },
-    { id: 'gbt7714', label: 'GB/T 7714' },
-    { id: 'cell', label: 'Cell Press' },
-  ];
+  const styleOptions = CITATION_STYLES.map((s) => ({ id: s.id, label: t(s.labelKey) }));
 
   // Collapsed/expanded handled via width transition below
 
@@ -142,7 +136,6 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
     <aside
       className={`border-l border-border-default ${isCollapsed ? 'bg-sunken' : 'bg-surface'} flex flex-col shrink-0 overflow-visible contain-layout transition-[width,background-color] duration-250 ease-smooth-out ${isCollapsed ? 'w-[var(--source-panel-collapsed-width)] items-center py-4 cursor-pointer hover:bg-surface' : 'w-[var(--source-panel-width)]'}`}
       onClick={isCollapsed ? onToggle : undefined}
-      title={isCollapsed ? "Expand Source Panel (Ctrl+\)" : undefined}
     >
       {isCollapsed ? (
         <div className="flex flex-col items-center justify-between h-full py-4">
@@ -154,13 +147,15 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
           </div>
           <div className="mt-auto flex flex-col items-center gap-1.5">
             {unsupportedClaimsCount > 0 && (
-              <span
-                className="px-1.5 py-0.5 rounded bg-trust-warning/20 border border-trust-warning/40 text-[9px] font-mono text-trust-warning font-bold flex items-center gap-1 animate-in zoom-in-95 fade-in duration-150"
-                title={`${unsupportedClaimsCount} unsupported claims`}
-              >
-                <AlertTriangle className="w-3 h-3 text-trust-warning" />
-                <span>{unsupportedClaimsCount}</span>
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span className="px-1.5 py-0.5 rounded bg-trust-warning/20 border border-trust-warning/40 text-[9px] font-mono text-trust-warning font-bold flex items-center gap-1 animate-in zoom-in-95 fade-in duration-150">
+                    <AlertTriangle className="w-3 h-3 text-trust-warning" />
+                    <span>{unsupportedClaimsCount}</span>
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent>{`${unsupportedClaimsCount} unsupported claims`}</TooltipContent>
+              </Tooltip>
             )}
             <div className="px-1.5 py-1 rounded bg-surface border border-border-default text-[10px] font-mono text-text-tertiary">
               {citedReferences.length > 0 ? citedReferences.length : activeSource ? '1' : '0'}
@@ -182,41 +177,64 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
           <span className="text-[11px] text-text-tertiary font-mono">
             {t('sourcePanel.toggleHint')}
           </span>
-          <button
-            type="button"
-            onClick={onToggle}
-            className="p-1 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary transition-[transform,background-color,color] duration-150 active:scale-90 focus-visible:ring-2 focus-visible:ring-accent"
-            title="Collapse (Ctrl+\)"
-          >
-            <ChevronRight className="w-4 h-4" />
-          </button>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button
+                type="button"
+                onClick={onToggle}
+                className="p-1 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary transition-[transform,background-color,color] duration-150 active:scale-90 focus-visible:ring-2 focus-visible:ring-accent"
+              >
+                <ChevronRight className="w-4 h-4" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent>Collapse (Ctrl+\)</TooltipContent>
+          </Tooltip>
         </div>
       </div>
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'source' | 'claims' | 'bibliography')} className="flex flex-col flex-1">
-        <TabsList className="w-full grid grid-cols-3 rounded-none border-b border-border-default bg-sunken/40 p-1 mb-2 relative z-10">
-          <TabsTrigger value="source" className="text-xs py-2 flex items-center justify-center">
-            {t('sourcePanel.activeSource')}
-          </TabsTrigger>
-          <TabsTrigger value="claims" className="text-xs py-2 flex items-center justify-center space-x-1.5">
-            <span>Claims</span>
-            {unsupportedClaimsCount > 0 && (
-              <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-trust-warning/20 text-trust-warning font-bold flex items-center gap-0.5">
-                <AlertTriangle className="w-2.5 h-2.5 text-trust-warning inline" />
-                <span>{unsupportedClaimsCount}</span>
-              </span>
-            )}
-          </TabsTrigger>
-          <TabsTrigger value="bibliography" className="text-xs py-2 flex items-center justify-center space-x-1.5">
-            <span>{t('sourcePanel.bibliography')}</span>
-            {citedReferences.length > 0 && (
-              <span className="text-[10px] font-mono px-1.5 py-0.5 rounded bg-surface border border-border-default">
-                {citedReferences.length}
-              </span>
-            )}
-          </TabsTrigger>
-        </TabsList>
+        <div className="px-3 pt-3 pb-2 border-b border-border-default/60 bg-surface">
+          <TabsList className="w-full h-auto p-1 bg-sunken rounded-lg border border-border-default/60 flex items-center gap-1">
+            <TabsTrigger
+              value="source"
+              className="flex-1 min-w-0 py-1.5 px-2 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all truncate data-[state=active]:bg-surface data-[state=active]:text-text-primary data-[state=active]:font-semibold data-[state=active]:shadow-xs hover:text-text-primary"
+              title={t('sourcePanel.activeSource')}
+            >
+              <Quote className="w-3.5 h-3.5 shrink-0 text-accent/70" />
+              <span className="truncate">Passage</span>
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="claims"
+              className="flex-1 min-w-0 py-1.5 px-2 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all truncate data-[state=active]:bg-surface data-[state=active]:text-text-primary data-[state=active]:font-semibold data-[state=active]:shadow-xs hover:text-text-primary"
+              title="Claim Verification & Flags"
+            >
+              <ShieldCheck className="w-3.5 h-3.5 shrink-0 text-accent/70" />
+              <span className="truncate">Claims</span>
+              {unsupportedClaimsCount > 0 && (
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-trust-warning/20 text-trust-warning font-bold flex items-center gap-0.5 shrink-0">
+                  <AlertTriangle className="w-2.5 h-2.5 text-trust-warning inline" />
+                  <span>{unsupportedClaimsCount}</span>
+                </span>
+              )}
+            </TabsTrigger>
+
+            <TabsTrigger
+              value="bibliography"
+              className="flex-1 min-w-0 py-1.5 px-2 text-[11px] font-medium flex items-center justify-center gap-1.5 rounded-md transition-all truncate data-[state=active]:bg-surface data-[state=active]:text-text-primary data-[state=active]:font-semibold data-[state=active]:shadow-xs hover:text-text-primary"
+              title={t('sourcePanel.bibliography')}
+            >
+              <BookOpen className="w-3.5 h-3.5 shrink-0 text-accent/70" />
+              <span className="truncate">Bibliography</span>
+              {citedReferences.length > 0 && (
+                <span className="text-[9px] font-mono px-1.5 py-0.5 rounded bg-surface border border-border-default text-text-tertiary shrink-0">
+                  {citedReferences.length}
+                </span>
+              )}
+            </TabsTrigger>
+          </TabsList>
+        </div>
 
         <div className="p-4 space-y-4 flex-1">
           <TabsContent value="source" className="space-y-4 mt-0 data-[state=active]:animate-in data-[state=active]:fade-in data-[state=active]:duration-150">
@@ -329,42 +347,57 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
             <div className="flex items-center justify-between pb-2 border-b border-border-default/60">
               <div className="flex items-center space-x-1.5 text-xs">
                 <span className="text-text-secondary font-medium">{t('sourcePanel.styleSelector')}:</span>
-                <select
-                  value={citationStyle}
-                  onChange={(e) => setCitationStyle(e.target.value as CitationStyle)}
-                  className="px-1.5 py-0.5 rounded border border-border-default bg-surface text-text-primary text-xs font-semibold focus:outline-none focus-visible:ring-2 focus-visible:ring-accent"
-                >
-                  {styleOptions.map((opt) => (
-                    <option key={opt.id} value={opt.id}>
-                      {opt.label}
-                    </option>
-                  ))}
-                </select>
+                <Select value={citationStyle} onValueChange={(v) => setCitationStyle(v as CitationStyle)}>
+                  <SelectTrigger className="w-auto min-w-[110px] h-6 text-xs font-semibold bg-surface">
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {styleOptions.map((opt) => (
+                      <SelectItem key={opt.id} value={opt.id}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
 
               {formattedBibliography.length > 0 && (
                 <div className="flex items-center space-x-1">
-                  <button
-                    type="button"
-                    onClick={handleCopyAll}
-                    className="p-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
-                    title={t('sourcePanel.copyBib')}
-                  >
-                    {copiedAll ? <Check className="w-3.5 h-3.5 text-trust-grounded" /> : <Copy className="w-3.5 h-3.5" />}
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={handleCopyAll}
+                        className="p-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
+                      >
+                        {copiedAll ? <Check className="w-3.5 h-3.5 text-trust-grounded" /> : <Copy className="w-3.5 h-3.5" />}
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t('sourcePanel.copyBib')}</TooltipContent>
+                  </Tooltip>
                   {onOpenBibtexModal && (
-                    <button
-                      type="button"
-                      onClick={() => onOpenBibtexModal('export')}
-                      className="p-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
-                      title={t('sourcePanel.exportBib')}
-                    >
-                      <Download className="w-3.5 h-3.5" />
-                    </button>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <button
+                          type="button"
+                          onClick={() => onOpenBibtexModal('export')}
+                          className="p-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent"
+                        >
+                          <Download className="w-3.5 h-3.5" />
+                        </button>
+                      </TooltipTrigger>
+                      <TooltipContent>{t('sourcePanel.exportBib')}</TooltipContent>
+                    </Tooltip>
                   )}
                 </div>
               )}
             </div>
+
+            {copyFallback && (
+              <div role="alert" className="p-2 rounded border border-trust-warning/30 bg-trust-warning/10 text-xs text-trust-warning">
+                {copyFallback}
+              </div>
+            )}
 
             {/* References List */}
             {formattedBibliography.length > 0 ? (
@@ -391,18 +424,22 @@ export const SourcePanel: React.FC<SourcePanelProps> = ({
                     >
                       <div className="flex items-center justify-between text-[10px] text-text-tertiary font-mono mb-1">
                         <span className="font-bold text-accent">{item.inlineMarker}</span>
-                        <button
-                          type="button"
-                          onClick={() => handleCopySingle(item.referenceId, item.bibliographyEntry)}
-                          className="hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent rounded"
-                          title="Copy entry"
-                        >
-                          {copiedId === item.referenceId ? (
-                            <Check className="w-3 h-3 text-trust-grounded" />
-                          ) : (
-                            <Copy className="w-3 h-3" />
-                          )}
-                        </button>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              onClick={() => handleCopySingle(item.referenceId, item.bibliographyEntry)}
+                              className="hover:text-text-primary focus-visible:ring-2 focus-visible:ring-accent rounded"
+                            >
+                              {copiedId === item.referenceId ? (
+                                <Check className="w-3 h-3 text-trust-grounded" />
+                              ) : (
+                                <Copy className="w-3 h-3" />
+                              )}
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent>Copy entry</TooltipContent>
+                        </Tooltip>
                       </div>
                       <p className="font-serif text-[11px] text-text-primary">
                         {item.bibliographyEntry}

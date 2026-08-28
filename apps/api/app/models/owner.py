@@ -17,9 +17,8 @@ if TYPE_CHECKING:
 
 class Owner(Base):
     """
-    Polymorphic owner entity (Roadmap 1.3).
-    Supports 'user' ownership in v1, and 'team' workspaces from Phase 3,
-    avoiding costly migrations later.
+    Owner entity (Roadmap 1.3).
+    Single-user ownership — each user owns resources via a personal Owner.
     """
 
     __tablename__ = "owners"
@@ -27,10 +26,10 @@ class Owner(Base):
     id: Mapped[str] = mapped_column(String(36), primary_key=True, default=lambda: str(uuid.uuid4()))
     owner_type: Mapped[str] = mapped_column(
         String(20), nullable=False, default="user"
-    )  # 'user' | 'team'
+    )  # 'user'
     name: Mapped[str | None] = mapped_column(
         String(255), nullable=True
-    )  # Team name if owner_type == 'team'
+    )
     description: Mapped[str | None] = mapped_column(String(1000), nullable=True)
     created_by_user_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     created_at: Mapped[datetime] = mapped_column(

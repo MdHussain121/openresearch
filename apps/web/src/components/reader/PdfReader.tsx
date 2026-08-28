@@ -81,9 +81,41 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
   );
   const tables = Array.isArray(metadata.tables) ? metadata.tables : [];
   const equations = Array.isArray(metadata.equations) ? metadata.equations : [];
-  const pages = Array.isArray(metadata.pages) ? metadata.pages : [];
+  const pages = useMemo(
+    () => (Array.isArray(metadata.pages) ? metadata.pages : []),
+    [metadata]
+  );
   const totalPages = Math.max(pages.length, metadata.page_count || 1, 1);
   const isUnverified = paper.extraction_status === 'unverified';
+
+  // Check if paper has a locally stored and served PDF file
+  const hasLocalPdf = useMemo(() => {
+    return Boolean(metadata.pdf_path);
+  }, [metadata]);
+
+  // External source / web URL (e.g. arXiv abstract page or DOI landing page)
+  const externalSourceUrl = useMemo(() => {
+    return (
+      (metadata.pdf_url as string) ||
+      (metadata.url as string) ||
+      (paper.arxiv_id ? `https://arxiv.org/abs/${paper.arxiv_id}` : '') ||
+      (paper.doi ? `https://doi.org/${paper.doi}` : '') ||
+      null
+    );
+  }, [metadata, paper]);
+
+  // Determine the type of "no text" situation for better fallback messaging
+  const noTextReason = useMemo(() => {
+    if (pages.length === 0 && sections.length === 0) {
+      // No pages and no sections - likely DOI/arXiv/PMID added without PDF
+      return 'identifier_only';
+    }
+    if (pages.length > 0 && pages.every((p) => !p.text?.trim())) {
+      // Pages exist but all empty - scanned/image PDF
+      return 'scanned_pdf';
+    }
+    return 'missing_page_data';
+  }, [pages, sections]);
 
   // Handle Text Selection in Document Reader
   const handleMouseUp = () => {
@@ -185,7 +217,11 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
   const currentPageData = pages.find((p) => p.page_number === currentPage) || {
     page_number: currentPage,
     text: sections.filter((s) => s.page_number === currentPage).map((s) => `${s.title}\n\n${s.text}`).join('\n\n') ||
-      'No extracted text for this page. Please refer to the PDF render.',
+      (noTextReason === 'identifier_only'
+        ? 'Paper added via identifier (DOI/arXiv/PMID) without PDF upload. No extracted text available. Download from publisher or upload PDF.'
+        : noTextReason === 'scanned_pdf'
+        ? 'This PDF appears to be scanned or image-based. Text extraction not possible without OCR. View PDF below.'
+        : 'No extracted text for this page. Please refer to the PDF render.'),
   };
 
   return (
@@ -383,6 +419,18 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{t('reader.unverifiedBanner')}</span>
           </div>
+          {(hasLocalPdf || externalSourceUrl) && (
+            <a
+              href={hasLocalPdf ? `/api/v1/papers/${paper.id}/pdf` : externalSourceUrl!}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="flex items-center space-x-1 px-2 py-1 text-xs bg-trust-warning/20 border border-trust-warning/40 rounded hover:bg-trust-warning/30 transition-colors"
+              title="View original source"
+            >
+              <ExternalLink className="w-3 h-3" />
+              <span>{hasLocalPdf ? "View PDF Original" : "Open Source Web Page"}</span>
+            </a>
+          )}
         </div>
       )}
 
@@ -396,38 +444,65 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
             }`}
             onMouseUp={handleMouseUp}
           >
-            <div
-              className="w-full max-w-3xl bg-surface border border-border-default rounded-lg shadow-sm p-6 md:p-10 space-y-6 transition-transform origin-top"
-              style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 150ms var(--ease-smooth-out)' }}
-            >
-              {/* Simulated Paper Header */}
-              <div className="border-b border-border-default pb-4 space-y-2 text-center">
-                <h1 className="font-serif font-bold text-xl md:text-2xl text-text-primary leading-tight">
-                  {paper.title}
-                </h1>
-                <p className="text-xs text-text-secondary">
-                  {paper.authors?.map((a) => a.literal || `${a.givenName || ''} ${a.familyName}`.trim()).join(', ')}
-                </p>
-                {paper.doi && (
-                  <p className="text-[11px] text-text-tertiary font-mono">DOI: {paper.doi}</p>
-                )}
+            {hasLocalPdf ? (
+              <div className="w-full max-w-3xl h-[calc(100%-4rem)] md:h-[calc(100%-8rem)]">
+                <iframe
+                  src={`/api/v1/papers/${paper.id}/pdf`}
+                  className="w-full h-full border border-border-default rounded-lg shadow-sm bg-white"
+                  title={`${paper.title} - PDF`}
+                  sandbox="allow-scripts allow-same-origin allow-forms"
+                />
               </div>
-
-              {/* Page Content Render */}
-              <div className="space-y-4 text-xs md:text-sm leading-relaxed text-text-primary font-serif">
-                {currentPageData.text.split('\n\n').map((para, idx) => (
-                  <p key={idx} className="tracking-normal">
-                    {para}
+            ) : (
+              <div
+                className="w-full max-w-3xl bg-surface border border-border-default rounded-lg shadow-sm p-6 md:p-10 space-y-6 transition-transform origin-top"
+                style={{ transform: `scale(${zoomLevel / 100})`, transformOrigin: 'top center', transition: 'transform 150ms var(--ease-smooth-out)' }}
+              >
+                {/* Simulated Paper Header */}
+                <div className="border-b border-border-default pb-4 space-y-2 text-center">
+                  <h1 className="font-serif font-bold text-xl md:text-2xl text-text-primary leading-tight">
+                    {paper.title}
+                  </h1>
+                  <p className="text-xs text-text-secondary">
+                    {paper.authors?.map((a) => a.literal || `${a.givenName || ''} ${a.familyName}`.trim()).join(', ')}
                   </p>
-                ))}
-              </div>
+                  <div className="flex items-center justify-center gap-3 pt-1 flex-wrap">
+                    {paper.doi && (
+                      <p className="text-[11px] text-text-tertiary font-mono">DOI: {paper.doi}</p>
+                    )}
+                    {paper.arxiv_id && (
+                      <p className="text-[11px] text-text-tertiary font-mono">arXiv: {paper.arxiv_id}</p>
+                    )}
+                    {externalSourceUrl && (
+                      <a
+                        href={externalSourceUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center space-x-1 text-[11px] text-accent hover:underline font-medium"
+                      >
+                        <ExternalLink className="w-3 h-3" />
+                        <span>Open Source in Browser</span>
+                      </a>
+                    )}
+                  </div>
+                </div>
 
-              {/* Page Footer */}
-              <div className="border-t border-border-default/60 pt-4 flex items-center justify-between text-[11px] text-text-tertiary font-sans">
-                <span>OpenResearch Reader • {paper.title.slice(0, 30)}...</span>
-                <span>Page {currentPage} of {totalPages}</span>
+                {/* Page Content Render */}
+                <div className="space-y-4 text-xs md:text-sm leading-relaxed text-text-primary font-serif">
+                  {currentPageData.text.split('\n\n').map((para, idx) => (
+                    <p key={idx} className="tracking-normal">
+                      {para}
+                    </p>
+                  ))}
+                </div>
+
+                {/* Page Footer */}
+                <div className="border-t border-border-default/60 pt-4 flex items-center justify-between text-[11px] text-text-tertiary font-sans">
+                  <span>OpenResearch Reader • {paper.title.slice(0, 30)}...</span>
+                  <span>Page {currentPage} of {totalPages}</span>
+                </div>
               </div>
-            </div>
+            )}
           </div>
         )}
 

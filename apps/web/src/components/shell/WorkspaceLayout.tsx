@@ -99,19 +99,18 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
         <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:top-2 focus:left-2 focus:z-[100] focus:bg-surface focus:p-2 focus:rounded focus:text-accent focus:outline-none focus:ring-2 focus:ring-accent">
           Skip to main content
         </a>
-        {/* 48px Fixed Top Bar */}
+        {/* Unified TopBar & Custom Desktop Title Bar */}
         <TopBar
           projects={projects}
           activeProject={activeProject}
           setActiveProject={setActiveProject}
+          activeDocumentTitle={activeDocument?.title}
           saveStatus={saveStatus}
           isDark={w.isDark}
           toggleTheme={w.toggleTheme}
           onOpenSearch={() => w.openSearchModal()}
           onOpenShortcuts={w.openShortcutsModal}
           onOpenNewProject={w.openProjectModal}
-          onOpenTeams={w.openTeamModal}
-          localUserLabel="Local Researcher"
         />
 
         {/* Main Workspace Layout (Sidebar + Content + Source Panel) */}
@@ -160,6 +159,7 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
           isContinuationOpen={w.continuation.isOpen}
           isContinuationLoading={w.continuation.isLoading}
           continuationText={w.continuation.text}
+          continuationError={w.continuation.error}
           continuationGroundingState={w.continuation.groundingState}
           continuationSources={w.continuation.sources}
           continuationLatency={w.continuation.latency}
@@ -193,11 +193,15 @@ export const WorkspaceLayout: React.FC<{ children: React.ReactNode }> = ({ child
         {/* Floating Reference Toast Notification (UI/UX §4.1) - bottom-center with progress */}
 {(toastMessage || isToastClosing) && (
           <div
-            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-border-default bg-surface px-4 py-2.5 shadow-xl text-xs font-medium text-text-primary flex items-center space-x-2 overflow-hidden transition-[transform,opacity] duration-250 ease-smooth-out data-[state=closing]:duration-150 data-[state=closing]:ease-in toast-enter"
+            className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50 rounded-lg border border-border-default bg-surface px-4 py-2.5 shadow-xl text-xs font-medium text-text-primary flex items-center space-x-2 overflow-hidden transition-[translate,opacity] duration-250 ease-smooth-out data-[state=closing]:duration-150 data-[state=closing]:ease-in toast-enter"
             style={{
-              transitionProperty: 'transform, opacity',
-              transitionDuration: 'var(--duration-emphasis), var(--duration-emphasis)',
-              transitionTimingFunction: 'var(--ease-smooth-out), var(--ease-smooth-out)',
+              transitionProperty: 'translate, opacity',
+              transitionDuration: isToastClosing
+                ? 'var(--duration-quick), var(--duration-quick)'
+                : 'var(--duration-emphasis), var(--duration-emphasis)',
+              transitionTimingFunction: isToastClosing
+                ? 'var(--ease-in), var(--ease-in)'
+                : 'var(--ease-smooth-out), var(--ease-smooth-out)',
             }}
             data-state={isToastClosing ? 'closing' : 'open'}
           >

@@ -22,7 +22,13 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
+  Select,
+  SelectTrigger,
+  SelectContent,
+  SelectItem,
+  SelectValue,
 } from '@openresearch/ui';
+import { CITATION_STYLES } from '../../lib/citationStyles';
 
 interface ExportModalProps {
   isOpen: boolean;
@@ -211,42 +217,21 @@ export const ExportModal: React.FC<ExportModalProps> = ({
           {/* Citation Style Selector (for DOCX, PDF, Markdown) */}
           {selectedFormat !== 'bibtex' && (
             <div className="space-y-2 pt-2 border-t border-border-default/60">
-              <label htmlFor="citation-style-select" className="block font-semibold text-text-primary uppercase tracking-wider text-[11px]">
+              <label className="block font-semibold text-text-primary uppercase tracking-wider text-[11px]">
                 {t('exportModal.styleLabel')}
               </label>
-              <select
-                id="citation-style-select"
-                value={selectedStyle}
-                onChange={(e) => setSelectedStyle(e.target.value)}
-                className="w-full px-3 py-2 rounded-md border border-border-default bg-sunken text-text-primary focus:outline-none focus-visible:ring-2 focus-visible:ring-accent text-xs"
-              >
-                <option value="apa">{t('citations.styles.apa')}</option>
-                <option value="mla">{t('citations.styles.mla')}</option>
-                <option value="chicago">{t('citations.styles.chicago')}</option>
-                <option value="chicago-notes">{t('citations.styles.chicagoNotes')}</option>
-                <option value="ieee">{t('citations.styles.ieee')}</option>
-                <option value="harvard">{t('citations.styles.harvard')}</option>
-                <option value="vancouver">{t('citations.styles.vancouver')}</option>
-                <option value="nature">{t('citations.styles.nature')}</option>
-                <option value="science">{t('citations.styles.science')}</option>
-                <option value="acm">{t('citations.styles.acm')}</option>
-                <option value="acs">{t('citations.styles.acs')}</option>
-                <option value="turabian">{t('citations.styles.turabian')}</option>
-                <option value="ama">{t('citations.styles.ama')}</option>
-                <option value="nlm">{t('citations.styles.nlm')}</option>
-                <option value="cse">{t('citations.styles.cse')}</option>
-                <option value="apsa">{t('citations.styles.apsa')}</option>
-                <option value="asa">{t('citations.styles.asa')}</option>
-                <option value="aaa">{t('citations.styles.aaa')}</option>
-                <option value="mhra">{t('citations.styles.mhra')}</option>
-                <option value="oxford">{t('citations.styles.oxford')}</option>
-                <option value="oscola">{t('citations.styles.oscola')}</option>
-                <option value="bluebook">{t('citations.styles.bluebook')}</option>
-                <option value="abnt">{t('citations.styles.abnt')}</option>
-                <option value="iso690">{t('citations.styles.iso690')}</option>
-                <option value="gbt7714">{t('citations.styles.gbt7714')}</option>
-                <option value="cell">{t('citations.styles.cell')}</option>
-              </select>
+              <Select value={selectedStyle} onValueChange={setSelectedStyle}>
+                <SelectTrigger className="w-full h-8 text-xs bg-sunken">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {CITATION_STYLES.map((opt) => (
+                    <SelectItem key={opt.id} value={opt.id}>
+                      {t(opt.labelKey)}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
             </div>
           )}
 

@@ -1,9 +1,10 @@
 'use client';
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { t } from '../../i18n';
 import { api } from '../../lib/api';
 import { getErrorMessage } from '../../lib/errors';
+import { copyWithFallback } from '../../lib/clipboard';
 import { useProject } from '../../context/ProjectContext';
 import { useDocument } from '../../context/DocumentContext';
 import { usePaper } from '../../context/PaperContext';
@@ -26,6 +27,7 @@ import {
   TabsList,
   TabsTrigger,
   TabsContent,
+  Button,
 } from '@openresearch/ui';
 
 interface BibtexModalProps {
@@ -51,6 +53,8 @@ export const BibtexModal: React.FC<BibtexModalProps> = ({
   const [copied, setCopied] = useState(false);
   const [statusMessage, setStatusMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [selectedFileName, setSelectedFileName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     setActiveTab(defaultTab);
@@ -84,12 +88,15 @@ export const BibtexModal: React.FC<BibtexModalProps> = ({
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    setSelectedFileName(file.name);
     const reader = new FileReader();
     reader.onload = (event) => {
       const text = event.target?.result as string;
       setBibtexInput(text || '');
     };
     reader.readAsText(file);
+    // allow re-selecting same file
+    e.target.value = '';
   };
 
   const handleImport = async () => {
@@ -103,6 +110,7 @@ export const BibtexModal: React.FC<BibtexModalProps> = ({
       await loadPapers();
       setStatusMessage(`Successfully imported ${res.total_imported} reference(s) into your library.`);
       setBibtexInput('');
+      setSelectedFileName(null);
     } catch (err: unknown) {
       setError(getErrorMessage(err, 'Failed to import BibTeX'));
     } finally {
@@ -110,11 +118,15 @@ export const BibtexModal: React.FC<BibtexModalProps> = ({
     }
   };
 
-  const handleCopy = () => {
+  const handleCopy = async () => {
     if (!exportContent) return;
-    navigator.clipboard.writeText(exportContent);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    const ok = await copyWithFallback(exportContent);
+    if (ok) {
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } else {
+      setError('Copy failed. Please select and copy manually.');
+    }
   };
 
   const handleDownload = () => {
@@ -171,11 +183,21 @@ export const BibtexModal: React.FC<BibtexModalProps> = ({
                   {t('bibtexModal.uploadFile')}
                 </label>
                 <input
+                  ref={fileInputRef}
                   type="file"
                   accept=".bib,.txt"
                   onChange={handleFileUpload}
-                  className="block w-full text-xs text-text-secondary file:mr-3 file:py-1.5 file:px-3 file:rounded file:border file:border-border-default file:text-xs file:font-medium file:text-text-primary file:bg-sunken hover:file:bg-surface hover:file:text-text-primary cursor-pointer focus-visible:ring-2 focus-visible:ring-accent"
+                  className="hidden"
                 />
+                <div className="flex items-center gap-2">
+                  <Button variant="outline" size="sm" onClick={() => fileInputRef.current?.click()}>
+                    <Upload className="w-3.5 h-3.5" />
+                    <span>Choose File</span>
+                  </Button>
+                  <span className="text-xs truncate max-w-[220px] text-text-secondary">
+                    {selectedFileName ?? 'No file chosen'}
+                  </span>
+                </div>
               </div>
 
               <div>

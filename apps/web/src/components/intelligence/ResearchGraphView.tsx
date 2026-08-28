@@ -4,6 +4,7 @@ import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react'
 import { api, ResearchGraphDTO, RelatedPaperDTO, GraphNodeDTO, GraphEdgeDTO, GraphClusterDTO } from '../../lib/api';
 import { useProject } from '../../context/ProjectContext';
 import { t } from '../../i18n';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@openresearch/ui';
 import { ViewHeader } from '../shell/ViewHeader';
 import {
   Share2,
@@ -223,27 +224,39 @@ export const ResearchGraphView: React.FC<ResearchGraphViewProps> = ({
 
             {/* Zoom Controls */}
             <div className="flex items-center gap-1">
-              <button
-                onClick={() => setZoomLevel((z) => Math.min(1.8, z + 0.15))}
-                className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
-                title="Zoom in"
-              >
-                <ZoomIn className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.15))}
-                className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
-                title="Zoom out"
-              >
-                <ZoomOut className="w-4 h-4" />
-              </button>
-              <button
-                onClick={() => setZoomLevel(1)}
-                className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
-                title="Reset zoom"
-              >
-                <RotateCcw className="w-4 h-4" />
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setZoomLevel((z) => Math.min(1.8, z + 0.15))}
+                    className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
+                  >
+                    <ZoomIn className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Zoom in</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setZoomLevel((z) => Math.max(0.6, z - 0.15))}
+                    className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
+                  >
+                    <ZoomOut className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Zoom out</TooltipContent>
+              </Tooltip>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => setZoomLevel(1)}
+                    className="p-1 text-secondary hover:text-primary rounded hover:bg-sunken transition-[transform,background-color] duration-150 active:scale-90"
+                  >
+                    <RotateCcw className="w-4 h-4" />
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Reset zoom</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 

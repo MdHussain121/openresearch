@@ -10,7 +10,6 @@ import { AiOutlineModal } from '../modals/AiOutlineModal';
 import { ExportModal } from '../modals/ExportModal';
 import { ZoteroImportModal } from '../modals/ZoteroImportModal';
 import { ProviderQuotaModal } from '../modals/ProviderQuotaModal';
-import { TeamModal } from '../modals/TeamModal';
 import { VersionHistoryModal } from '../modals/VersionHistoryModal';
 import { PluginManagerModal } from '../modals/PluginManagerModal';
 import { useDocument } from '../../context/DocumentContext';
@@ -69,7 +68,6 @@ export const ModalContainer: React.FC = () => {
       />
       <ZoteroImportModal isOpen={m.isZoteroOpen} onClose={m.closeZotero} />
       <ProviderQuotaModal isOpen={m.isProviderQuotaOpen} onClose={m.closeProviderQuota} />
-      <TeamModal isOpen={m.isTeamOpen} onClose={m.closeTeam} />
       <VersionHistoryModal
         isOpen={m.isVersionHistoryOpen}
         documentId={activeDocument?.id || ''}

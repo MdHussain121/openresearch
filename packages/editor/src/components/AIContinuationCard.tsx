@@ -1,13 +1,14 @@
 'use client';
 
 import React, { useState, useEffect, useCallback } from 'react';
-import { Sparkles, Check, RefreshCw, X, BookOpen, Clock } from 'lucide-react';
+import { Sparkles, Check, RefreshCw, X, BookOpen, Clock, AlertTriangle } from 'lucide-react';
 import { GroundedPassage, GroundingState } from '@openresearch/ai';
 
 export interface AIContinuationCardProps {
   isOpen: boolean;
   isLoading: boolean;
   continuationText: string;
+  error?: string | null;
   groundingState: GroundingState;
   sources: GroundedPassage[];
   latencyMs?: number;
@@ -21,6 +22,7 @@ export const AIContinuationCard: React.FC<AIContinuationCardProps> = ({
   isOpen,
   isLoading,
   continuationText,
+  error,
   groundingState,
   sources,
   latencyMs,
@@ -40,6 +42,19 @@ export const AIContinuationCard: React.FC<AIContinuationCardProps> = ({
     }, 150);
   }, [onDismiss]);
 
+  // Esc should dismiss the card even when focus stays in the editor
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.preventDefault();
+        handleDismiss();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, handleDismiss]);
+
   if (!isOpen && !isClosing) return null;
 
   const isGrounded = groundingState === 'source-grounded' && sources && sources.length > 0;
@@ -48,13 +63,8 @@ export const AIContinuationCard: React.FC<AIContinuationCardProps> = ({
     <>
       <div className="fixed inset-0 z-40 bg-black/5 animate-in fade-in duration-150" aria-hidden="true" />
       <div
-        className="fixed bottom-12 right-12 z-50 w-[420px] max-w-[calc(100vw-48px)] rounded-lg border border-border-default bg-surface shadow-xl overflow-hidden font-sans text-xs transition-[transform,opacity] duration-250 ease-smooth-out data-[state=closing]:duration-150 data-[state=closing]:ease-in"
+        className="fixed bottom-4 right-4 left-4 sm:left-auto sm:bottom-12 sm:right-12 z-50 w-auto sm:w-[420px] sm:max-w-md rounded-lg border border-border-default bg-surface shadow-xl overflow-hidden font-sans text-xs animate-in fade-in slide-in-from-bottom-4 duration-250 ease-smooth-out data-[state=closing]:animate-out data-[state=closing]:fade-out data-[state=closing]:slide-out-to-bottom-4 data-[state=closing]:duration-150 will-change-transform data-[state=open]:animate-in data-[state=open]:fade-in data-[state=open]:slide-in-from-bottom-4"
         data-state={isClosing ? 'closing' : 'open'}
-        style={{
-          transitionProperty: 'transform, opacity',
-          transitionDuration: 'var(--duration-emphasis), var(--duration-emphasis)',
-          transitionTimingFunction: 'var(--ease-smooth-out), var(--ease-smooth-out)',
-        }}
       >
       {/* Header Bar */}
       <div className="flex items-center justify-between px-3.5 py-2.5 bg-sunken border-b border-border-default">
@@ -84,6 +94,11 @@ export const AIContinuationCard: React.FC<AIContinuationCardProps> = ({
           <div className="py-6 flex flex-col items-center justify-center space-y-2 text-text-tertiary">
             <RefreshCw className="w-5 h-5 animate-spin text-accent" />
             <span className="text-[11px]">Synthesizing literature-grounded continuation...</span>
+          </div>
+        ) : error ? (
+          <div className="py-3 flex items-start space-x-2 rounded border border-trust-warning/30 bg-trust-warning/10 px-3 py-2 text-[12px] text-text-primary">
+            <AlertTriangle className="w-4 h-4 text-trust-warning shrink-0 mt-0.5" />
+            <span>{error}</span>
           </div>
         ) : (
           <>
@@ -152,7 +167,7 @@ export const AIContinuationCard: React.FC<AIContinuationCardProps> = ({
           <button
             type="button"
             onClick={onAccept}
-            disabled={isLoading || !continuationText}
+            disabled={isLoading || !continuationText || !!error}
             className="flex items-center space-x-1 px-3 py-1.5 rounded bg-accent text-white hover:bg-accent-hover font-medium transition-[background-color,box-shadow] duration-150 active:scale-[0.97] shadow-2xs disabled:opacity-50 focus-visible:ring-2 focus-visible:ring-accent"
           >
             <Check className="w-3.5 h-3.5" />

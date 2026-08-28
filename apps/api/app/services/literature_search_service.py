@@ -1,6 +1,8 @@
 import asyncio
 import logging
+import random
 import re
+import time
 from typing import Any
 
 from app.core.authors import split_full_name
@@ -11,6 +13,10 @@ logger = logging.getLogger("openresearch.literature_search")
 
 SEARCH_TIMEOUT_SECONDS = 12.0
 SEARCH_CACHE_TTL_SECONDS = 3600
+
+_S2_lock = asyncio.Lock()
+_S2_last_ts: float = 0.0
+_S2_min_interval = 1.1  # S2 allows 1 req/sec with key, 1.1 gives buffer
 
 PROVIDER_NAMES = {
     "openalex": "OpenAlex",
@@ -36,12 +42,22 @@ def _strip_tags(raw: str | None) -> str | None:
     return text or None
 
 
+async def _throttle_s2() -> None:
+    global _S2_last_ts
+    async with _S2_lock:
+        now = time.monotonic()
+        wait = _S2_min_interval - (now - _S2_last_ts)
+        if wait > 0:
+            await asyncio.sleep(wait + random.uniform(0, 0.05))
+        _S2_last_ts = time.monotonic()
+
+
 class LiteratureSearchService:
     """
     Searches open academic literature APIs (all keyless) and normalizes results:
       - OpenAlex (https://api.openalex.org)
       - Crossref (https://api.crossref.org)
-      - arXiv export API (http://export.arxiv.org/api/query)
+       - arXiv export API (https://export.arxiv.org/api/query)
       - Semantic Scholar Graph API (https://api.semanticscholar.org/graph/v1)
 
     Every provider call is cached via provider_cache_service and failures are
@@ -362,7 +378,7 @@ class LiteratureSearchService:
 
         client = get_async_http_client()
         resp = await client.get(
-            "http://export.arxiv.org/api/query",
+            "https://export.arxiv.org/api/query",
             params=params,
             timeout=SEARCH_TIMEOUT_SECONDS,
         )
@@ -454,12 +470,45 @@ class LiteratureSearchService:
         if cached is not None:
             return cached
 
+        await _throttle_s2()
+
+        from app.core.config import settings as _settings
+
+        headers: dict[str, str] = {}
+        if getattr(_settings, "SEMANTIC_SCHOLAR_API_KEY", None):
+            headers["x-api-key"] = _settings.SEMANTIC_SCHOLAR_API_KEY
+
         client = get_async_http_client()
-        resp = await client.get(
-            "https://api.semanticscholar.org/graph/v1/paper/search",
-            params=params,
-            timeout=SEARCH_TIMEOUT_SECONDS,
-        )
+        # retry once on 429 respecting Retry-After
+        for attempt in range(2):
+            resp = await client.get(
+                "https://api.semanticscholar.org/graph/v1/paper/search",
+                params=params,
+                headers=headers or None,
+                timeout=SEARCH_TIMEOUT_SECONDS,
+            )
+            if resp.status_code != 429:
+                break
+            retry_after = None
+            try:
+                hdrs = getattr(resp, "headers", None)
+                if hdrs is not None:
+                    try:
+                        val = hdrs.get("Retry-After")
+                    except Exception:
+                        val = None
+                    if isinstance(val, (str, int)):
+                        retry_after = val
+            except Exception:
+                retry_after = None
+            try:
+                retry_secs = int(retry_after) if retry_after else 2
+            except (ValueError, TypeError):
+                retry_secs = 2
+            if attempt == 0:
+                await asyncio.sleep(retry_secs)
+                continue
+            raise ValueError(f"Semantic Scholar rate limit reached — retry after {retry_secs}s")
         if resp.status_code == 429:
             raise ValueError("Semantic Scholar rate limit reached — try again shortly")
         if resp.status_code != 200:

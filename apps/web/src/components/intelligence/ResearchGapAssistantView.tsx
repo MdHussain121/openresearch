@@ -10,6 +10,7 @@ import {
   ResearchGapLimitationDTO,
   ResearchGapQuoteDTO,
 } from '../../lib/api';
+import { copyWithFallback } from '../../lib/clipboard';
 import { getErrorMessage } from '../../lib/errors';
 import { t } from '../../i18n';
 import { ViewHeader } from '../shell/ViewHeader';
@@ -123,11 +124,15 @@ export const ResearchGapAssistantView: React.FC<ResearchGapAssistantViewProps> =
     return md;
   };
 
-  const handleCopyMarkdown = () => {
+  const handleCopyMarkdown = async () => {
     const md = formatGapsAsMarkdown();
-    navigator.clipboard.writeText(md);
-    setCopiedState(true);
-    setTimeout(() => setCopiedState(false), 2000);
+    const ok = await copyWithFallback(md);
+    if (ok) {
+      setCopiedState(true);
+      setTimeout(() => setCopiedState(false), 2000);
+    } else {
+      setErrorMessage('Copy failed. Please select and copy manually.');
+    }
   };
 
   const handleInsert = () => {

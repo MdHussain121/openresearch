@@ -43,6 +43,9 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
   const [yearEnd, setYearEnd] = useState('');
   const [openAccessOnly, setOpenAccessOnly] = useState(false);
   const [isSearching, setIsSearching] = useState(false);
+  const LIMIT = 10;
+  const [offset, setOffset] = useState(0);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [searchError, setSearchError] = useState<string | null>(null);
   const [outcome, setOutcome] = useState<Awaited<ReturnType<typeof api.research.search>> | null>(null);
   const [importingKey, setImportingKey] = useState<string | null>(null);
@@ -63,14 +66,20 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
     });
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
+  const handleSearch = async (e: React.FormEvent | null, nextOffset = 0) => {
+    if (e) {
+      e.preventDefault();
+    }
     const cleanQuery = query.trim();
-    if (!cleanQuery || isSearching) return;
+    if (!cleanQuery) return;
 
-    setIsSearching(true);
+    if (nextOffset === 0) {
+      setIsSearching(true);
+      setHasSearched(true);
+    } else {
+      setIsLoadingMore(true);
+    }
     setSearchError(null);
-    setHasSearched(true);
 
     try {
       const result = await api.research.search({
@@ -79,14 +88,39 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
         yearStart: yearStart ? parseInt(yearStart, 10) : undefined,
         yearEnd: yearEnd ? parseInt(yearEnd, 10) : undefined,
         openAccessOnly,
+        limit: LIMIT,
+        offset: nextOffset,
       });
-      setOutcome(result);
+      if (nextOffset === 0) {
+        setOutcome(result);
+      } else {
+        setOutcome((prev) => ({
+          query: result.query,
+          sources: result.sources.map((s, i) => ({
+            ...s,
+            results: [...(prev?.sources[i]?.results || []), ...s.results],
+          })),
+        }));
+      }
+      if (nextOffset === 0) {
+        setOffset(0);
+      }
     } catch (err: unknown) {
       setSearchError(getErrorMessage(err, 'Online search failed — please try again.'));
-      setOutcome(null);
+      if (nextOffset === 0) {
+        setOutcome(null);
+      }
     } finally {
       setIsSearching(false);
+      setIsLoadingMore(false);
     }
+  };
+
+  const handleLoadMore = async () => {
+    setIsLoadingMore(true);
+    await handleSearch(null, offset + LIMIT);
+    setOffset((prev) => prev + LIMIT);
+    setIsLoadingMore(false);
   };
 
   const handleImport = async (result: LiteratureResultDTO, resultKey: string) => {
@@ -100,7 +134,7 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
       await loadPapers();
       setImportedKeys((prev) => ({ ...prev, [resultKey]: true }));
     } catch (err: unknown) {
-      alert(getErrorMessage(err, 'Failed to add paper to library.'));
+      setSearchError(getErrorMessage(err, 'Failed to add paper to library.'));
     } finally {
       setImportingKey(null);
     }
@@ -216,7 +250,7 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
       <div className="flex-1 overflow-y-auto p-6">
         <div className="max-w-4xl mx-auto space-y-5">
           {searchError && (
-            <div className="p-3 rounded border border-trust-danger/30 bg-trust-danger/10 text-trust-danger flex items-start space-x-2 text-xs">
+            <div role="alert" className="p-3 rounded border border-trust-danger/30 bg-trust-danger/10 text-trust-danger flex items-start space-x-2 text-xs">
               <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
               <span>{searchError}</span>
             </div>
@@ -274,7 +308,7 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
                 </div>
 
                 {source.results.map((result, index) => {
-                  const resultKey = `${source.source}-${index}`;
+                  const resultKey = `${source.source}-${offset}-${index}`;
                   const isImported = importedKeys[resultKey] === true;
                   const identifier = result.doi || result.arxiv_id;
                   const abstractExpanded = expandedAbstracts[resultKey] === true;
@@ -408,6 +442,17 @@ export const OnlineSearchPanel: React.FC<OnlineSearchPanelProps> = () => {
                 })}
               </section>
             ))}
+            {outcome && outcome.sources.some((s) => s.results.length === LIMIT || (s.total && s.results.length < s.total)) && (
+              <div className="flex justify-center py-4 border-t border-border-default">
+                <button
+                  onClick={handleLoadMore}
+                  disabled={isLoadingMore}
+                  className="px-4 py-2 text-xs rounded border border-accent text-accent hover:bg-accent/5 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {isLoadingMore ? 'Loading…' : 'Load more'}
+                </button>
+              </div>
+            )}
         </div>
       </div>
     </div>

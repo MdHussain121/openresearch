@@ -6,7 +6,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 import pytest
-from fastapi import FastAPI, WebSocketDisconnect
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from sqlalchemy.orm import Session
 
@@ -352,11 +352,11 @@ def test_collab_websocket_happy_and_unauthorized(client: TestClient, db: Session
     assert login_resp.status_code == 200, login_resp.text
     token = login_resp.json()["access_token"]
 
-    # unauthorized: bad token -> server closes with policy-violation before joining the room
-    with pytest.raises(WebSocketDisconnect):
-        with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:
-            ws.send_json({"type": "auth", "token": "bad"})
-            ws.receive_text()
+    # Local-first: bad token falls back to local user and joins room
+    with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:
+        ws.send_json({"type": "auth", "token": "bad"})
+        room_state = ws.receive_json()
+        assert room_state["type"] == "room_state"
 
     # happy path: authenticate first, exercise every message type then disconnect
     with client.websocket_connect(f"/api/v1/ws/collaborate/{doc['id']}") as ws:

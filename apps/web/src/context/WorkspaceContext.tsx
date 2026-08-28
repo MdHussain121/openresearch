@@ -60,6 +60,7 @@ export interface ContinuationState {
   isOpen: boolean;
   isLoading: boolean;
   text: string;
+  error: string | null;
   groundingState: GroundingState;
   sources: GroundedPassage[];
   latency: number;
@@ -95,7 +96,6 @@ export interface ModalsState {
   bibtexTab: 'import' | 'export';
   isZoteroOpen: boolean;
   isProviderQuotaOpen: boolean;
-  isTeamOpen: boolean;
   isVersionHistoryOpen: boolean;
   isPluginsOpen: boolean;
   searchSeedQuery: string;
@@ -108,7 +108,6 @@ export interface ModalsState {
   closeBibtex: () => void;
   closeZotero: () => void;
   closeProviderQuota: () => void;
-  closeTeam: () => void;
   closeVersionHistory: () => void;
   closePlugins: () => void;
 }
@@ -142,7 +141,6 @@ interface WorkspaceContextType {
   openExportModal: () => void;
   openShortcutsModal: () => void;
   openProjectModal: () => void;
-  openTeamModal: () => void;
   openPluginsModal: () => void;
   openProviderQuotaModal: () => void;
   openZoteroModal: () => void;
@@ -178,6 +176,7 @@ interface WorkspaceContextType {
     sectionHeading?: string
   ) => Promise<void>;
   triggerAIEdit: (text: string, action: AIEditActionType) => Promise<void>;
+  registerContinuationInserter: (fn: ((text: string) => boolean) | null) => void;
 
   // Misc actions
   srAnnouncement: string;
@@ -257,7 +256,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [bibtexModalTab, setBibtexModalTab] = useState<'import' | 'export'>('import');
   const [isZoteroModalOpen, setIsZoteroModalOpen] = useState(false);
   const [isProviderQuotaModalOpen, setIsProviderQuotaModalOpen] = useState(false);
-  const [isTeamModalOpen, setIsTeamModalOpen] = useState(false);
   const [isVersionModalOpen, setIsVersionModalOpen] = useState(false);
   const [isPluginModalOpen, setIsPluginModalOpen] = useState(false);
   const [searchSeedQuery, setSearchSeedQuery] = useState('');
@@ -269,7 +267,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const openExportModal = useCallback(() => setIsExportModalOpen(true), []);
   const openShortcutsModal = useCallback(() => setIsShortcutsModalOpen(true), []);
   const openProjectModal = useCallback(() => setIsProjectModalOpen(true), []);
-  const openTeamModal = useCallback(() => setIsTeamModalOpen(true), []);
   const openPluginsModal = useCallback(() => setIsPluginModalOpen(true), []);
   const openProviderQuotaModal = useCallback(() => setIsProviderQuotaModalOpen(true), []);
   const openZoteroModal = useCallback(() => setIsZoteroModalOpen(true), []);
@@ -296,7 +293,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       bibtexTab: bibtexModalTab,
       isZoteroOpen: isZoteroModalOpen,
       isProviderQuotaOpen: isProviderQuotaModalOpen,
-      isTeamOpen: isTeamModalOpen,
       isVersionHistoryOpen: isVersionModalOpen,
       isPluginsOpen: isPluginModalOpen,
       searchSeedQuery,
@@ -309,7 +305,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       closeBibtex: () => setIsBibtexModalOpen(false),
       closeZotero: () => setIsZoteroModalOpen(false),
       closeProviderQuota: () => setIsProviderQuotaModalOpen(false),
-      closeTeam: () => setIsTeamModalOpen(false),
       closeVersionHistory: () => setIsVersionModalOpen(false),
       closePlugins: () => setIsPluginModalOpen(false),
     }),
@@ -324,7 +319,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       bibtexModalTab,
       isZoteroModalOpen,
       isProviderQuotaModalOpen,
-      isTeamModalOpen,
       isVersionModalOpen,
       isPluginModalOpen,
       searchSeedQuery,
@@ -421,6 +415,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const [isContinuationOpen, setIsContinuationOpen] = useState(false);
   const [isContinuationLoading, setIsContinuationLoading] = useState(false);
   const [continuationText, setContinuationText] = useState('');
+  const [continuationError, setContinuationError] = useState<string | null>(null);
   const [continuationGroundingState, setContinuationGroundingState] =
     useState<GroundingState>('general-knowledge');
   const [continuationSources, setContinuationSources] = useState<GroundedPassage[]>([]);
@@ -430,6 +425,10 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     paragraph: string;
     section?: string;
   }>({ prefix: '', paragraph: '', section: '' });
+  const continuationInserterRef = useRef<((text: string) => boolean) | null>(null);
+  const registerContinuationInserter = useCallback((fn: ((text: string) => boolean) | null) => {
+    continuationInserterRef.current = fn;
+  }, []);
 
   const runContinuation = useCallback(
     async (prefixText: string, paragraphContext: string, sectionHeading?: string) => {
@@ -442,6 +441,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       setIsContinuationOpen(true);
       setIsContinuationLoading(true);
       setContinuationText('');
+      setContinuationError(null);
       setContinuationSources([]);
 
       const startTime = performance.now();
@@ -455,6 +455,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         const elapsed = Math.round(performance.now() - startTime);
 
         setContinuationText(res.text || '');
+        setContinuationError(null);
         setContinuationGroundingState(
           (res.grounding_state as GroundingState) || 'general-knowledge'
         );
@@ -462,7 +463,16 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         setContinuationLatency(elapsed);
         recordAiRequest();
       } catch (err) {
-        setContinuationText('Failed to generate continuation. Please verify backend connection.');
+        // Preserve raw error for debugging; keep continuationText empty so
+        // Accept is disabled and the error is not insertable into the doc.
+        const raw = err instanceof Error ? err.message : String(err);
+        const is503 = raw.includes('503') || raw.toLowerCase().includes('requires an ai provider');
+        setContinuationText('');
+        setContinuationError(
+          is503
+            ? 'No AI provider is available. Configure a cloud provider at Settings > AI Providers, or ensure Tabby/Ollama is running.'
+            : 'Failed to generate continuation. Please verify backend connection.'
+        );
         setContinuationGroundingState('general-knowledge');
       } finally {
         setIsContinuationLoading(false);
@@ -472,19 +482,56 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   );
 
   const handleAcceptContinuation = useCallback(() => {
-    if (activeDocument && continuationText) {
+    if (!continuationText || continuationError) return;
+    // Prefer inline insertion at the current cursor via the editor.
+    // This keeps continuation inside the current paragraph instead of
+    // appending a new block at the end of the document (bug: "next line").
+    const insertedInline = continuationInserterRef.current?.(continuationText) ?? false;
+    if (!insertedInline) {
+      // Fallback: append at document end (e.g. editor not yet mounted).
+      if (!activeDocument) return;
       const current = activeDocument.plain_text || '';
+      const inline = continuationText.startsWith(' ') || current.endsWith(' ') || !current
+        ? continuationText
+        : ` ${continuationText}`;
+      // Append inline to last paragraph instead of forcing a new block
+      const base = (activeDocument.content_json as Record<string, unknown>) || { type: 'doc', content: [] };
+      const content = Array.isArray((base as Record<string, unknown>).content)
+        ? [...((base as Record<string, unknown>).content as unknown[])]
+        : [];
+      if (content.length === 0) {
+        content.push({ type: 'paragraph', content: [{ type: 'text', text: inline.trimStart() }] });
+      } else {
+        const last = content[content.length - 1] as Record<string, unknown>;
+        const lastContent = Array.isArray((last as Record<string, unknown>).content)
+          ? [...((last as Record<string, unknown>).content as unknown[])]
+          : [];
+        lastContent.push({ type: 'text', text: inline });
+        content[content.length - 1] = { ...last, content: lastContent };
+      }
       updateActiveDocument({
-        plain_text: current ? `${current}\n\n${continuationText}` : continuationText,
+        plain_text: current ? `${current}${inline}` : inline.trimStart(),
+        content_json: { ...base, type: 'doc', content },
       });
     }
     setIsContinuationOpen(false);
     announce('Continuation accepted and inserted into document.');
-  }, [activeDocument, continuationText, updateActiveDocument, announce]);
+  }, [activeDocument, continuationText, continuationError, updateActiveDocument, announce]);
 
-  const dismissContinuation = useCallback(() => setIsContinuationOpen(false), []);
+  const dismissContinuation = useCallback(() => {
+    setIsContinuationOpen(false);
+    // Clear stale payload so a dismissed proposal never leaks into the doc.
+    // runContinuation will repopulate on next Ctrl+/ / Regenerate.
+    setContinuationText('');
+    setContinuationError(null);
+    setContinuationSources([]);
+    setContinuationLatency(0);
+  }, []);
 
   const regenerateContinuation = useCallback(() => {
+    // Regenerate reuses the exact prefix/paragraph that produced the current
+    // card so the result is comparable. runContinuation manages loading/error
+    // and will replace text/error on completion.
     runContinuation(
       continuationContext.prefix,
       continuationContext.paragraph,
@@ -497,6 +544,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isOpen: isContinuationOpen,
       isLoading: isContinuationLoading,
       text: continuationText,
+      error: continuationError,
       groundingState: continuationGroundingState,
       sources: continuationSources,
       latency: continuationLatency,
@@ -508,6 +556,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       isContinuationOpen,
       isContinuationLoading,
       continuationText,
+      continuationError,
       continuationGroundingState,
       continuationSources,
       continuationLatency,
@@ -568,8 +617,21 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const handleAcceptEdit = useCallback(() => {
     if (activeDocument && editOriginalText && editSuggestedText) {
       const current = activeDocument.plain_text || '';
+      const nextPlain = current.replace(editOriginalText, editSuggestedText);
+      // Patch TipTap JSON so the editor re-renders when focused; fallback to
+      // string replacement inside the JSON payload when structure is unknown.
+      let nextJson: Record<string, unknown> | undefined;
+      try {
+        const raw = JSON.stringify(activeDocument.content_json || {});
+        if (raw.includes(editOriginalText)) {
+          nextJson = JSON.parse(raw.replaceAll(editOriginalText, editSuggestedText)) as Record<string, unknown>;
+        }
+      } catch {
+        // leave nextJson undefined — plain_text is authoritative for persistence
+      }
       updateActiveDocument({
-        plain_text: current.replace(editOriginalText, editSuggestedText),
+        plain_text: nextPlain,
+        ...(nextJson ? { content_json: nextJson } : {}),
       });
     }
     setIsEditReviewOpen(false);
@@ -663,7 +725,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openExportModal,
       openShortcutsModal,
       openProjectModal,
-      openTeamModal,
       openPluginsModal,
       openProviderQuotaModal,
       openZoteroModal,
@@ -692,6 +753,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       editReview,
       triggerContinuation: runContinuation,
       triggerAIEdit: runAIEdit,
+      registerContinuationInserter,
 
       announce,
       insertOutline,
@@ -718,7 +780,6 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       openExportModal,
       openShortcutsModal,
       openProjectModal,
-      openTeamModal,
       openPluginsModal,
       openProviderQuotaModal,
       openZoteroModal,
@@ -740,6 +801,7 @@ export const WorkspaceProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       editReview,
       runContinuation,
       runAIEdit,
+      registerContinuationInserter,
       announce,
       insertOutline,
       srAnnouncement,

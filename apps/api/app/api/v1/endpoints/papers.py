@@ -286,19 +286,34 @@ def get_paper_status(
             detail="You do not have permission to view this paper",
         )
 
+    # Determine step based on extraction status and OCR
+    ocr_triggered = paper.metadata_json.get("ocr_triggered") if paper.metadata_json else False
+    pre_ocr_chars = paper.metadata_json.get("pre_ocr_chars_per_page") if paper.metadata_json else None
+
+    if ocr_triggered:
+        step = "ocr"
+        step_index = 3  # upload=1, extracting=2, ocr=3, embeddings=4, ready=5
+        message = "OCR processing in progress..."
+        # Estimate OCR progress based on pre-ocr chars and current status
+        # This is a rough estimate since extraction runs synchronously
+        ocr_progress = {
+            "current_page": paper.metadata_json.get("page_count", 0),
+            "total_pages": paper.metadata_json.get("page_count", 0),
+        } if pre_ocr_chars is not None else None
+    else:
+        step = "ready"
+        step_index = 4
+        message = "Extraction verified" if paper.extraction_status == "ok" else "Extraction unverified (low confidence)"
+        ocr_progress = None
+
     return PaperStatusResponse(
         paper_id=paper.id,
-        # NOTE (audit-11 H-5): PDF processing runs synchronously in the upload
-        # handler, so by the time the client polls this endpoint extraction is
-        # already complete.  The step is always "ready" / step_index=4.
-        # A background queue with real transitions is needed per §41.
-        step="ready",
-        step_index=4,
+        step=step,
+        step_index=step_index,
         extraction_status=paper.extraction_status,
         chunks_count=db.query(PaperChunk).filter(PaperChunk.paper_id == paper.id).count(),
-        message="Extraction verified"
-        if paper.extraction_status == "ok"
-        else "Extraction unverified (low confidence)",
+        message=message,
+        ocr_progress=ocr_progress,
     )
 
 

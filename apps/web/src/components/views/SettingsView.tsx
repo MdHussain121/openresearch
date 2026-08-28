@@ -3,6 +3,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Boxes, Settings as SettingsIcon } from 'lucide-react';
 import { ViewHeader } from '../shell/ViewHeader';
+import { Select, SelectTrigger, SelectContent, SelectItem, SelectValue } from '@openresearch/ui';
 import { useWorkspace } from '../../context/WorkspaceContext';
 import { t } from '../../i18n';
 import { api } from '../../lib/api';
@@ -282,17 +283,17 @@ export const SettingsView: React.FC = () => {
 
             <div className="border-t border-border-default pt-3 space-y-2">
               <div className="font-medium text-text-primary">{t('settings.hourlySuggestionCap')}</div>
-              <select
-                value={w.hourlyCap}
-                onChange={(e) => w.setHourlyCap(Number(e.target.value))}
-                className="w-full px-2.5 py-1.5 rounded border border-border-input bg-sunken text-text-primary"
-                aria-label={t('settings.hourlySuggestionCap')}
-              >
-                <option value="50">{t('settings.cap50')}</option>
-                <option value="100">{t('settings.cap100')}</option>
-                <option value="200">{t('settings.cap200')}</option>
-                <option value="-1">{t('settings.capUnlimited')}</option>
-              </select>
+              <Select value={String(w.hourlyCap)} onValueChange={(v) => w.setHourlyCap(Number(v))}>
+                <SelectTrigger className="w-full h-8 bg-sunken" aria-label={t('settings.hourlySuggestionCap')}>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="50">{t('settings.cap50')}</SelectItem>
+                  <SelectItem value="100">{t('settings.cap100')}</SelectItem>
+                  <SelectItem value="200">{t('settings.cap200')}</SelectItem>
+                  <SelectItem value="-1">{t('settings.capUnlimited')}</SelectItem>
+                </SelectContent>
+              </Select>
               <p className="text-[11px] text-text-tertiary">
                 {t('settings.hourlySuggestionCapDesc')} (Used this hour: {w.hourlyUsage.count})
               </p>

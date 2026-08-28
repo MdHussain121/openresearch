@@ -18,7 +18,6 @@ from app.api.v1.endpoints import (
     provider_settings,
     provider_status,
     research,
-    teams,
     version_history,
     zotero,
 )
@@ -38,7 +37,6 @@ api_router.include_router(zotero.router, tags=["Zotero Sync"])
 api_router.include_router(provider_status.router, tags=["Provider Status"])
 api_router.include_router(research.router, tags=["Literature Search"])
 api_router.include_router(provider_settings.router, tags=["AI Provider Settings"])
-api_router.include_router(teams.router, tags=["Team Workspaces"])
 api_router.include_router(collaboration.router, tags=["Real-Time Collaboration"])
 api_router.include_router(comments.router, tags=["Comments"])
 api_router.include_router(version_history.router, tags=["Version History"])

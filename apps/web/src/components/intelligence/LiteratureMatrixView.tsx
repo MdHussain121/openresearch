@@ -4,6 +4,7 @@ import React, { useState, useMemo, useCallback } from 'react';
 import { usePaper } from '../../context/PaperContext';
 import { useProject } from '../../context/ProjectContext';
 import { api, LiteratureMatrixResponseDTO, LiteratureMatrixRowDTO, MatrixCellDTO } from '../../lib/api';
+import { copyWithFallback } from '../../lib/clipboard';
 import { getErrorMessage } from '../../lib/errors';
 import { t } from '../../i18n';
 import { ViewHeader } from '../shell/ViewHeader';
@@ -110,11 +111,15 @@ export const LiteratureMatrixView: React.FC<LiteratureMatrixViewProps> = ({
     }
   };
 
-  const handleCopyMarkdown = () => {
+  const handleCopyMarkdown = async () => {
     if (!matrixData) return;
-    navigator.clipboard.writeText(matrixData.markdown_table);
-    setCopiedState(true);
-    setTimeout(() => setCopiedState(false), 2000);
+    const ok = await copyWithFallback(matrixData.markdown_table);
+    if (ok) {
+      setCopiedState(true);
+      setTimeout(() => setCopiedState(false), 2000);
+    } else {
+      setErrorMessage('Copy failed. Please select and copy manually.');
+    }
   };
 
   const handleDownloadCsv = () => {
@@ -458,7 +463,7 @@ export const LiteratureMatrixView: React.FC<LiteratureMatrixViewProps> = ({
 {/* Cell Evidence Inspector Drawer */}
       {(inspectedCell || isInspectorClosing) && (
         <div className="fixed inset-0 z-50 bg-black/40 flex justify-end transition-opacity duration-150 ease-smooth-out data-[state=open]:opacity-100 data-[state=closed]:opacity-0 data-[state=closed]:duration-150 data-[state=closed]:ease-out backdrop-enter" data-state={isInspectorClosing ? 'closed' : 'open'}>
-          <div className="w-full max-w-md bg-surface h-full shadow-xl border-l border-border-default flex flex-col p-6 overflow-y-auto transition-[transform,opacity] duration-400 ease-smooth-out data-[state=open]:translate-x-0 data-[state=open]:opacity-100 data-[state=closed]:translate-x_full data-[state=closed]:opacity-0 data-[state=closed]:duration-350 data-[state=closed]:ease-out drawer-enter" data-state={isInspectorClosing ? 'closed' : 'open'} style={{ transitionTimingFunction: 'var(--ease-smooth-out)' }}>
+          <div className="w-full max-w-md bg-surface h-full shadow-xl border-l border-border-default flex flex-col p-6 overflow-y-auto transition-[transform,opacity] duration-400 ease-smooth-out data-[state=open]:translate-x-0 data-[state=open]:opacity-100 data-[state=closed]:translate-x-full data-[state=closed]:opacity-0 data-[state=closed]:duration-350 data-[state=closed]:ease-out drawer-enter" data-state={isInspectorClosing ? 'closed' : 'open'} style={{ transitionTimingFunction: 'var(--ease-smooth-out)' }}>
             {inspectedCell && (
               <>
                 <div className="flex items-center justify-between pb-4 border-b border-border-default">
@@ -509,7 +514,7 @@ export const LiteratureMatrixView: React.FC<LiteratureMatrixViewProps> = ({
                       Verbatim Source Excerpt
                     </span>
                     <div className="mt-1 p-3.5 bg-accent/5 border border-accent/20 rounded font-serif text-xs text-text-primary leading-relaxed italic">
-                      "{inspectedCell.cell.source_excerpt || inspectedCell.cell.value}"
+                      &ldquo;{inspectedCell.cell.source_excerpt || inspectedCell.cell.value}&rdquo;
                     </div>
                   </div>
                 </div>

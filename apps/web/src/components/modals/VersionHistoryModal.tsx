@@ -126,7 +126,7 @@ export const VersionHistoryModal: React.FC<VersionHistoryModalProps> = ({
         </DialogHeader>
 
         {/* Content Layout */}
-        <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-hidden">
+        <div className="grid grid-cols-1 md:grid-cols-3 flex-1 overflow-y-auto md:overflow-hidden">
           {/* Left: Versions Timeline */}
           <div className="border-r border-border-default bg-sunken/20 p-4 flex flex-col gap-2 overflow-y-auto">
             <span className="text-xs font-semibold uppercase tracking-wider text-text-secondary mb-1">

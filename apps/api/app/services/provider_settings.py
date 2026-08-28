@@ -106,14 +106,16 @@ def validate_provider_base_url(url: str) -> None:
         )
     try:
         addr = ipaddress.ip_address(hostname)
+    except ValueError:
+        # hostname is not an IP literal — that's fine (e.g. api.openai.com)
+        addr = None
+
+    if addr is not None:
         for net in _BLOCKED_NETS:
             if addr in net:
                 raise ValueError(
                     f"Provider base URL must not target private/reserved IP: {hostname}"
                 )
-    except ValueError:
-        # hostname is not an IP literal — that's fine (e.g. api.openai.com)
-        pass
     # Block common metadata IP literal patterns even with port tricks
     if hostname == "169.254.169.254":
         raise ValueError("Provider base URL must not target cloud metadata endpoint")
@@ -153,11 +155,69 @@ def set_global_rate_limit(rpm: int | None) -> int | None:
     return normalized
 
 
+def _candidate_store_paths() -> list[Path]:
+    """All locations where provider_keys.json may live (cwd-dependent drift)."""
+    candidates: list[Path] = []
+    # 1. Current working-directory resolution (legacy, varies with how uvicorn is launched)
+    try:
+        candidates.append(Path(settings.UPLOAD_DIR).resolve().parent / "provider_keys.json")
+    except Exception:
+        pass
+    # 2. Project-root storage (canonical)
+    try:
+        candidates.append(Path(__file__).resolve().parents[4] / "storage" / "provider_keys.json")
+    except Exception:
+        pass
+    # 3. API-package storage (used when cwd == apps/api)
+    try:
+        candidates.append(Path(__file__).resolve().parents[2] / "storage" / "provider_keys.json")
+    except Exception:
+        pass
+    # dedupe preserving order
+    seen: set[str] = set()
+    uniq: list[Path] = []
+    for p in candidates:
+        key = str(p).lower()
+        if key not in seen:
+            seen.add(key)
+            uniq.append(p)
+    return uniq
+
 def _store_path() -> Path:
-    return Path(settings.UPLOAD_DIR).resolve().parent / "provider_keys.json"
+    # primary: project-root canonical
+    return Path(__file__).resolve().parents[4] / "storage" / "provider_keys.json"
 
 
 def _load_store() -> dict[str, Any]:
+    # Merge from all candidates so settings written from any cwd are visible.
+    merged: dict[str, Any] = {"providers": {}, "active": None, "rate_limit_rpm": None}
+    found = False
+    for path in _candidate_store_paths():
+        if not path.exists():
+            continue
+        try:
+            raw = path.read_text(encoding="utf-8")
+            data = json.loads(raw)
+            if isinstance(data, dict):
+                # merge providers
+                if isinstance(data.get("providers"), dict):
+                    merged["providers"].update(data["providers"])
+                if data.get("active"):
+                    merged["active"] = data["active"]
+                if isinstance(data.get("rate_limit_rpm"), int):
+                    merged["rate_limit_rpm"] = data["rate_limit_rpm"]
+                if isinstance(data.get("autocomplete"), dict):
+                    # last writer wins for autocomplete
+                    merged["autocomplete"] = data["autocomplete"]
+                found = True
+        except Exception:
+            continue
+    if found:
+        merged.setdefault("providers", {})
+        merged.setdefault("active", None)
+        merged.setdefault("rate_limit_rpm", None)
+        return merged
+    # no candidate exists, return defaults
     path = _store_path()
     if not path.exists():
         return {"providers": {}, "active": None, "rate_limit_rpm": None}
@@ -213,6 +273,15 @@ def _save_store(store: dict[str, Any]) -> None:
         except OSError:
             pass
         raise
+    # also sync to alternative candidate paths so drift never recurs
+    for alt in _candidate_store_paths():
+        if alt == path:
+            continue
+        try:
+            alt.parent.mkdir(parents=True, exist_ok=True)
+            alt.write_text(json.dumps(store, indent=2) + "\n", encoding="utf-8")
+        except Exception:
+            pass
 
 
 def mask_key(api_key: str | None) -> str | None:

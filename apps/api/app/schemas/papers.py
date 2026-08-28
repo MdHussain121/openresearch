@@ -1,7 +1,7 @@
 """Paper & Annotation schemas."""
 
 from datetime import datetime
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import BaseModel, ConfigDict
 
@@ -55,13 +55,12 @@ class PaperDetailResponse(BaseModel):
 
 class PaperStatusResponse(BaseModel):
     paper_id: str
-    step: (
-        str  # Currently always 'ready' -- see audit-11 H-5; real transitions need a background queue
-    )
-    step_index: int  # Currently always 4
+    step: Literal["upload", "extracting", "ocr", "embeddings", "ready"]
+    step_index: int
     extraction_status: str  # 'ok' | 'unverified'
     chunks_count: int = 0
     message: str | None = None
+    ocr_progress: dict[str, int] | None = None
 
 
 class AnnotationCreate(BaseModel):

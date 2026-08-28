@@ -43,12 +43,12 @@ async def init_http_client() -> None:
     loop_id = _current_loop_id()
     if _async_client_stale(loop_id):
         _async_client = httpx.AsyncClient(
-            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS
+            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS, follow_redirects=True
         )
         _async_client_loop_id = loop_id
     if _sync_client is None or _sync_client.is_closed:
         _sync_client = httpx.Client(
-            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS
+            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS, follow_redirects=True
         )
     logger.info("Shared HTTP client connection pools initialized.")
 
@@ -85,7 +85,7 @@ def get_async_http_client() -> httpx.AsyncClient:
     ):
         return existing
     stale = existing
-    fresh = httpx.AsyncClient(limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS)
+    fresh = httpx.AsyncClient(limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS, follow_redirects=True)
     _async_client = fresh
     _async_client_loop_id = loop_id
     if stale is not None and not stale.is_closed and loop_id is not None:
@@ -114,6 +114,6 @@ def get_sync_http_client() -> httpx.Client:
     global _sync_client
     if _sync_client is None or _sync_client.is_closed:
         _sync_client = httpx.Client(
-            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS
+            limits=HTTP_LIMITS, timeout=DEFAULT_TIMEOUT, headers=DEFAULT_HEADERS, follow_redirects=True
         )
     return _sync_client

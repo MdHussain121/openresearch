@@ -6,7 +6,9 @@ import { useProject } from '../../context/ProjectContext';
 import { t } from '../../i18n';
 import { ConfirmDialog } from '../modals/ConfirmDialog';
 import { OnlineSearchPanel } from './OnlineSearchPanel';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@openresearch/ui';
 import { ViewHeader } from '../shell/ViewHeader';
+import { copyWithFallback } from '../../lib/clipboard';
 import {
   Upload,
   Search,
@@ -60,6 +62,8 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
   const [copiedCiteId, setCopiedCiteId] = useState<string | null>(null);
   const [pendingDeleteId, setPendingDeleteId] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'library' | 'online'>('library');
+  const [dropError, setDropError] = useState<string | null>(null);
+  const [copyFallback, setCopyFallback] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Drag and Drop handlers
@@ -81,9 +85,10 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
     if (e.dataTransfer.files && e.dataTransfer.files.length > 0) {
       const file = e.dataTransfer.files[0];
       if (file.name.toLowerCase().endsWith('.pdf') || file.type === 'application/pdf') {
+        setDropError(null);
         await uploadPaper(file);
       } else {
-        alert('Please select a valid PDF file.');
+        setDropError('Please select a valid PDF file.');
       }
     }
   };
@@ -98,17 +103,21 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
     }
   };
 
-  const handleCite = (paper: Paper, e: React.MouseEvent) => {
+  const handleCite = async (paper: Paper, e: React.MouseEvent) => {
     e.stopPropagation();
     if (onCitePaper) {
       onCitePaper(paper);
     }
-    // Copy inline citation to clipboard as fallback/feedback
     const firstAuthor = paper.authors?.[0]?.familyName || paper.authors?.[0]?.literal || 'Author';
     const citeText = `(${firstAuthor} et al., ${paper.year || 'n.d.'})`;
-    navigator.clipboard.writeText(citeText);
-    setCopiedCiteId(paper.id);
-    setTimeout(() => setCopiedCiteId(null), 2000);
+    const ok = await copyWithFallback(citeText);
+    if (ok) {
+      setCopiedCiteId(paper.id);
+      setTimeout(() => setCopiedCiteId(null), 2000);
+    } else {
+      setCopyFallback('Copy failed. Please copy manually: ' + citeText);
+      setTimeout(() => setCopyFallback(null), 3000);
+    }
   };
 
   const formatAuthors = (paper: Paper): string => {
@@ -147,6 +156,41 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
           <Upload className="w-12 h-12 text-accent animate-pulse-subtle mb-3" />
           <h3 className="font-serif font-bold text-lg text-text-primary animate-in fade-in slide-in-from-bottom-1 duration-250" style={{ animationDelay: '40ms' }}>Drop PDF to Upload</h3>
           <p className="text-xs text-text-secondary mt-1 animate-in fade-in duration-250" style={{ animationDelay: '80ms' }}>{t('library.uploadHint')}</p>
+        </div>
+      )}
+
+      {dropError && (
+        <div
+          role="alert"
+          className="mx-6 mt-3 flex items-start justify-between gap-2 rounded border border-trust-warning/30 bg-trust-warning/10 px-3 py-2 text-xs text-trust-warning"
+        >
+          <span className="flex items-start gap-2">
+            <AlertTriangle className="w-4 h-4 shrink-0 mt-0.5" />
+            <span>{dropError}</span>
+          </span>
+          <button
+            onClick={() => setDropError(null)}
+            aria-label="Dismiss error"
+            className="shrink-0 rounded p-0.5 hover:bg-trust-warning/15"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
+        </div>
+      )}
+
+      {copyFallback && (
+        <div
+          role="alert"
+          className="mx-6 mt-3 flex items-start justify-between gap-2 rounded border border-trust-warning/30 bg-trust-warning/10 px-3 py-2 text-xs text-trust-warning"
+        >
+          <span>{copyFallback}</span>
+          <button
+            onClick={() => setCopyFallback(null)}
+            aria-label="Dismiss"
+            className="shrink-0 rounded p-0.5 hover:bg-trust-warning/15"
+          >
+            <X className="w-3.5 h-3.5" />
+          </button>
         </div>
       )}
 
@@ -198,9 +242,28 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
               </div>
               <span className="text-text-tertiary">→</span>
 
-              {/* Step 3: Embeddings */}
+              {/* Step 3: OCR (conditional - shows when OCR was triggered) */}
+              {uploadProgress.ocrTotalPages && uploadProgress.ocrTotalPages > 0 && (
+                <>
+                  <div className="flex items-center space-x-1.5">
+                    {uploadProgress.step === 'upload' || uploadProgress.step === 'extracting' ? (
+                      <div className="w-3.5 h-3.5 rounded-full border border-text-tertiary" />
+                    ) : uploadProgress.step === 'ocr' ? (
+                      <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
+                    ) : (
+                      <CheckCircle2 className="w-4 h-4 text-trust-success" />
+                    )}
+                    <span className={uploadProgress.step === 'ocr' ? 'text-accent font-medium' : 'text-text-secondary'}>
+                      {t('pipeline.ocr')} {uploadProgress.ocrCurrentPage || 0}/{uploadProgress.ocrTotalPages}
+                    </span>
+                  </div>
+                  <span className="text-text-tertiary">→</span>
+                </>
+              )}
+
+              {/* Step 4: Embeddings */}
               <div className="flex items-center space-x-1.5">
-                {uploadProgress.step === 'upload' || uploadProgress.step === 'extracting' ? (
+                {uploadProgress.step === 'upload' || uploadProgress.step === 'extracting' || uploadProgress.step === 'ocr' ? (
                   <div className="w-3.5 h-3.5 rounded-full border border-text-tertiary" />
                 ) : uploadProgress.step === 'embeddings' ? (
                   <Loader2 className="w-3.5 h-3.5 text-accent animate-spin" />
@@ -213,7 +276,7 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
               </div>
               <span className="text-text-tertiary">→</span>
 
-              {/* Step 4: Ready */}
+              {/* Step 5: Ready */}
               <div className="flex items-center space-x-1.5">
                 {uploadProgress.step === 'ready' ? (
                   <CheckCircle2 className="w-4 h-4 text-trust-success" />
@@ -226,14 +289,18 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
               </div>
 
               {uploadProgress.step === 'ready' && (
-                <button
-                  onClick={dismissUploadProgress}
-                  className="ml-3 p-1 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary"
-                  title={t('common.close')}
-                  aria-label={t('common.close')}
-                >
-                  <X className="w-4 h-4" />
-                </button>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      onClick={dismissUploadProgress}
+                      className="ml-3 p-1 rounded hover:bg-sunken text-text-tertiary hover:text-text-primary"
+                      aria-label={t('common.close')}
+                    >
+                      <X className="w-4 h-4" />
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t('common.close')}</TooltipContent>
+                </Tooltip>
               )}
             </div>
           </div>
@@ -320,36 +387,48 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
                 </div>
 
                 {onOpenAddByIdentifier && (
-                  <button
-                    onClick={onOpenAddByIdentifier}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-text-primary transition-colors shrink-0"
-                    title="Add paper by DOI / arXiv ID / PMID"
-                  >
-                    <Quote className="w-3.5 h-3.5 text-accent" />
-                    <span>+ Identifier</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={onOpenAddByIdentifier}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-text-primary transition-colors shrink-0"
+                      >
+                        <Quote className="w-3.5 h-3.5 text-accent" />
+                        <span>+ Identifier</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Add paper by DOI / arXiv ID / PMID</TooltipContent>
+                  </Tooltip>
                 )}
 
                 {onOpenBibtexModal && (
-                  <button
-                    onClick={() => onOpenBibtexModal('import')}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-text-primary transition-colors shrink-0"
-                    title="Import or Export BibTeX"
-                  >
-                    <FileText className="w-3.5 h-3.5 text-text-secondary" />
-                    <span>BibTeX</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={() => onOpenBibtexModal('import')}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-text-primary transition-colors shrink-0"
+                      >
+                        <FileText className="w-3.5 h-3.5 text-text-secondary" />
+                        <span>BibTeX</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Import or Export BibTeX</TooltipContent>
+                  </Tooltip>
                 )}
 
                 {onOpenZoteroModal && (
-                  <button
-                    onClick={onOpenZoteroModal}
-                    className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-accent transition-colors shrink-0"
-                    title="Sync library with Zotero"
-                  >
-                    <BookOpen className="w-3.5 h-3.5" />
-                    <span>Zotero</span>
-                  </button>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <button
+                        onClick={onOpenZoteroModal}
+                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-surface hover:bg-sunken text-accent transition-colors shrink-0"
+                      >
+                        <BookOpen className="w-3.5 h-3.5" />
+                        <span>Zotero</span>
+                      </button>
+                    </TooltipTrigger>
+                    <TooltipContent>Sync library with Zotero</TooltipContent>
+                  </Tooltip>
                 )}
 
                 {/* Upload Button */}
@@ -491,31 +570,40 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
                     {/* Right: Three Fixed Action Buttons in Fixed Order: [Open] [Chat] [Cite] (UI/UX §3.3) */}
                     <div className="flex items-center space-x-2 shrink-0 self-end sm:self-center">
                       {/* 1. Open Button */}
-                      <button
-                        onClick={() => onOpenPaper(paper)}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
-                        title={t('library.open')}
-                      >
-                        <BookOpen className="w-3.5 h-3.5" />
-                        <span>{t('library.open')}</span>
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => onOpenPaper(paper)}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
+                          >
+                            <BookOpen className="w-3.5 h-3.5" />
+                            <span>{t('library.open')}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('library.open')}</TooltipContent>
+                      </Tooltip>
 
                       {/* 2. Chat Button */}
-                      <button
-                        onClick={() => onOpenChat(paper)}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
-                        title={t('library.chat')}
-                      >
-                        <MessageSquare className="w-3.5 h-3.5" />
-                        <span>{t('library.chat')}</span>
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={() => onOpenChat(paper)}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
+                          >
+                            <MessageSquare className="w-3.5 h-3.5" />
+                            <span>{t('library.chat')}</span>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('library.chat')}</TooltipContent>
+                      </Tooltip>
 
                       {/* 3. Cite Button */}
-                      <button
-                        onClick={(e) => handleCite(paper, e)}
-                        className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
-                        title={t('library.cite')}
-                      >
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => handleCite(paper, e)}
+                            className="flex items-center space-x-1.5 px-3 py-1.5 text-xs font-medium rounded border border-border-default bg-sunken hover:bg-surface text-text-primary hover:text-accent transition-[background-color,border-color,color] duration-150 active:scale-[0.97]"
+                          >
                         {copiedCiteId === paper.id ? (
                           <>
                             <Check className="w-3.5 h-3.5 text-trust-success" />
@@ -527,20 +615,27 @@ export const ResearchLibrary: React.FC<ResearchLibraryProps> = ({
                             <span>{t('library.cite')}</span>
                           </>
                         )}
-                      </button>
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('library.cite')}</TooltipContent>
+                      </Tooltip>
 
                       {/* Delete Button */}
-                      <button
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          setPendingDeleteId(paper.id);
-                        }}
-                        className="p-1.5 rounded border border-border-default hover:border-trust-danger/40 text-text-tertiary hover:text-trust-danger hover:bg-trust-danger/10 transition-[transform,background-color,border-color,color] duration-150 active:scale-90"
-                        title={t('library.delete')}
-                        aria-label={t('library.delete')}
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setPendingDeleteId(paper.id);
+                            }}
+                            className="p-1.5 rounded border border-border-default hover:border-trust-danger/40 text-text-tertiary hover:text-trust-danger hover:bg-trust-danger/10 transition-[transform,background-color,border-color,color] duration-150 active:scale-90"
+                            aria-label={t('library.delete')}
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </TooltipTrigger>
+                        <TooltipContent>{t('library.delete')}</TooltipContent>
+                      </Tooltip>
                     </div>
                   </div>
                  );

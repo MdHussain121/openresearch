@@ -11,11 +11,11 @@ export * from './export';
 export * from './intelligence';
 export * from './zotero';
 export * from './system';
-export * from './teams';
 export * from './comments';
 export * from './versions';
 export * from './graphs';
 export * from './plugins';
+export * from './providers';
 export * from './research';
 
 import { projectsApi } from './projects';
@@ -30,7 +30,6 @@ import { exportApi } from './export';
 import { intelligenceApi } from './intelligence';
 import { zoteroApi } from './zotero';
 import { systemApi } from './system';
-import { teamsApi } from './teams';
 import { commentsApi } from './comments';
 import { versionsApi } from './versions';
 import { graphsApi } from './graphs';
@@ -51,7 +50,6 @@ export const api = {
   intelligence: intelligenceApi,
   zotero: zoteroApi,
   system: systemApi,
-  teams: teamsApi,
   comments: commentsApi,
   versions: versionsApi,
   graphs: graphsApi,

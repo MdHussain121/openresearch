@@ -16,9 +16,8 @@ if TYPE_CHECKING:
 
 class Membership(Base):
     """
-    Reserved-but-active table from Phase 1.
-    Grants access between a User and an Owner (user or team).
-    Enforces v1 authorization uniformly (Roadmap 1.3).
+    Grants access between a User and an Owner.
+    Enforces authorization uniformly (Roadmap 1.3).
     """
 
     __tablename__ = "memberships"

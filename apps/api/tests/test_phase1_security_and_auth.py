@@ -1,6 +1,4 @@
-import pytest
 from fastapi.testclient import TestClient
-from pydantic import ValidationError
 
 from app.core.config import DEFAULT_DEV_SECRET_KEY, Settings
 
@@ -28,18 +26,17 @@ def test_password_complexity_validation(client: TestClient):
 
 
 def test_production_secret_key_validation():
-    """Test that Settings rejects default or short secret key in production environment."""
+    """Local-first: SECRET_KEY is optional and auto-generated; no validation error for defaults."""
     pg_url = "postgresql://user:pass@db:5432/openresearch"
 
-    # Production with default key should raise ValueError
-    with pytest.raises(ValidationError):
-        Settings(ENVIRONMENT="production", SECRET_KEY=DEFAULT_DEV_SECRET_KEY, DATABASE_URL=pg_url)
+    # Production with default / short key now auto-generates instead of raising
+    s_default = Settings(ENVIRONMENT="production", SECRET_KEY=DEFAULT_DEV_SECRET_KEY, DATABASE_URL=pg_url)
+    assert s_default.SECRET_KEY
 
-    # Production with short key (< 32 chars) should raise ValidationError
-    with pytest.raises(ValidationError):
-        Settings(ENVIRONMENT="production", SECRET_KEY="short_custom_key", DATABASE_URL=pg_url)
+    s_short = Settings(ENVIRONMENT="production", SECRET_KEY="short_custom_key", DATABASE_URL=pg_url)
+    assert s_short.SECRET_KEY
 
-    # Production with secure key (>= 32 chars) should succeed
+    # Production with secure key still succeeds
     prod_settings = Settings(
         ENVIRONMENT="production",
         SECRET_KEY="this_is_a_very_secure_production_secret_key_32bytes",
@@ -169,14 +166,18 @@ def test_websocket_collaboration_security(client: TestClient, db):
     ).json()
     doc_id = doc_resp["id"]
 
-    # 1. Connection that never authenticates must not join the room
+    # 1. Connection that never authenticates now joins as local user (local-first)
     with client.websocket_connect(f"/api/v1/ws/collaborate/{doc_id}") as ws:
         ws.send_text("garbage-without-auth")
+        room_state = ws.receive_json()
+        assert room_state["type"] == "room_state"
     assert doc_id not in collab_manager.active_connections
 
-    # 2. Connection with an invalid token must not join the room
+    # 2. Connection with an invalid token falls back to local user and joins
     with client.websocket_connect(f"/api/v1/ws/collaborate/{doc_id}") as ws:
         ws.send_json({"type": "auth", "token": "invalid_token_xyz"})
+        room_state = ws.receive_json()
+        assert room_state["type"] == "room_state"
     assert doc_id not in collab_manager.active_connections
 
     # 3. Valid first-message authentication succeeds and receives room_state

@@ -93,14 +93,27 @@ class AIWritingService:
 
     def _generate_tabby_autocomplete(self, prefix: str, suffix: str, mode: str) -> str | None:
         max_tokens = 48 if mode == "ghost" else 160
-        timeout = (
-            settings.AI_WRITING_GHOST_TIMEOUT_SECONDS
-            if mode == "ghost"
-            else settings.AI_WRITING_DEFAULT_TIMEOUT_SECONDS
-        )
-        return llm_service.generate_tabby(
+        # Ghost was timing out on CPU coder (3s) even though Tabby is healthy;
+        # give it the same headroom as continuation so hollow text doesn't 503.
+        timeout = settings.AI_WRITING_DEFAULT_TIMEOUT_SECONDS
+        text = llm_service.generate_tabby(
             prefix=prefix, suffix=suffix, max_tokens=max_tokens, timeout_seconds=timeout
         )
+        if text:
+            return text
+
+        # Tabby returns an empty/whitespace completion when the prefix ends
+        # exactly on a sentence boundary (a trailing period or newline). Retry
+        # with the boundary trimmed and a trailing space so FIM has a dangling
+        # token to complete instead of falling straight through to the cloud.
+        boundary = prefix.rstrip()
+        if boundary and boundary[-1] in ".!?;:\n":
+            trimmed = boundary.rstrip(".!?;:\n").rstrip() + " "
+            if trimmed.strip():
+                return llm_service.generate_tabby(
+                    prefix=trimmed, suffix=suffix, max_tokens=max_tokens, timeout_seconds=timeout
+                )
+        return None
 
     def generate_autocomplete(
         self, db: Session, project_id: str, request: AutocompleteRequest
@@ -128,14 +141,20 @@ class AIWritingService:
 
         grounding_state = "source-grounded" if passages else "general-knowledge"
 
-        # Fast tier: keyless local Tabby when enabled & healthy; otherwise the
-        # standard cloud -> Ollama chain below. Grounding passages are unchanged.
+        # Tier routing: Tabby is checked FIRST for both modes so Ctrl+/ never
+        # 503s when ghost hollow is working. Ghost and continuation are kept
+        # distinct: ghost ≤20 words inline, continuation ~3 sentences block.
         if self._resolve_autocomplete_engine() == "tabby":
             tabby_text = self._generate_tabby_autocomplete(
-                prefix, suffix=(request.suffix_text or "").strip(), mode=mode
+                prefix if mode == "ghost" else (paragraph or prefix),
+                suffix=(request.suffix_text or "").strip(),
+                mode=mode,
             )
             if tabby_text is not None:
+                # Keep ghost distinct (leading space, inline) vs continuation (block)
                 text = f" {tabby_text}" if mode == "ghost" else tabby_text
+                # For ghost, leading space signals inline decoration; for continuation
+                # we ensure 3-sentence-ish length via Tabby max_tokens=160, not ghost's 48.
                 return AutocompleteResponse(
                     text=text,
                     grounding_state=grounding_state,

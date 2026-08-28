@@ -39,8 +39,8 @@
   --topbar-height: 48px;
   --sidebar-width: 220px;
   --sidebar-collapsed-width: 56px;
-  --editor-max-width: 720px;
-  --source-panel-width: 320px;
+  --editor-max-width: 960px;
+  --source-panel-width: 340px;
   --source-panel-collapsed-width: 32px;
 
   /* Typography Scale */

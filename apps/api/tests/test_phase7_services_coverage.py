@@ -238,34 +238,11 @@ def test_export_engine_all_formats_and_options(db: Session):
     assert filename_pdf.endswith(".pdf")
 
 
-def test_teams_and_collaboration_extended_routes(client: TestClient):
-    """Verify team update, delete, member roles, and project comments."""
+def test_comments_extended_routes(client: TestClient):
+    """Verify project comments lifecycle (document comments, replies, resolve)."""
     headers, project_id = setup_auth_user_and_project(client)
 
-    # 1. Create team
-    team_res = client.post(
-        "/api/v1/teams/",
-        json={"name": "Vision & Language Lab", "description": "Multimodal research group"},
-        headers=headers,
-    )
-    assert team_res.status_code == 201
-    team_id = team_res.json()["id"]
-
-    # 2. Update team
-    update_res = client.patch(
-        f"/api/v1/teams/{team_id}",
-        json={"name": "Multimodal Intelligence Lab"},
-        headers=headers,
-    )
-    assert update_res.status_code == 200
-    assert update_res.json()["name"] == "Multimodal Intelligence Lab"
-
-    # 3. List members
-    members_res = client.get(f"/api/v1/teams/{team_id}/members", headers=headers)
-    assert members_res.status_code == 200
-    assert len(members_res.json()) >= 1
-
-    # 4. Create document & comments
+    # Create document & comments
     doc_res = client.post(
         "/api/v1/documents",
         json={"project_id": project_id, "title": "Collaborative Notes"},

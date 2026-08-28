@@ -159,8 +159,8 @@ def get_current_user(
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    # Local-first: local user is always admin (created as admin in get_or_create_local_user).
-    # Keep check for completeness but it will always pass.
+    if not current_user.is_admin:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Admin privileges required")
     return current_user
 
 
@@ -193,7 +193,6 @@ def verify_user_access_to_owner(
     """
     Core authorization helper (Roadmap 1.3).
     Checks if a user has an active Membership for the requested Owner.
-    Works identically for personal user owners and Phase 3 team workspaces.
     """
     query = db.query(Membership).filter(
         Membership.user_id == user_id, Membership.owner_id == owner_id

@@ -14,13 +14,17 @@ import TableCell from '@tiptap/extension-table-cell';
 import CodeBlock from '@tiptap/extension-code-block';
 import Placeholder from '@tiptap/extension-placeholder';
 
+import { TextSelection } from '@tiptap/pm/state';
+import { ArrowDown, Rows, Columns, Trash2 } from 'lucide-react';
 import { MathEquation } from '../extensions/math';
 import { CitationNode } from '../extensions/citation';
 import { TrustMarker } from '../extensions/trustMarker';
 import { GhostText } from '../extensions/ghostText';
 import { ClaimVerificationMark } from '../extensions/claimVerification';
+import { TextStyle, FontSize } from '../extensions/fontSize';
 import { EditorToolbar } from './EditorToolbar';
 import { CitationPopover } from './CitationPopover';
+import { TableContextMenu } from './TableContextMenu';
 import type { AcademicEditorProps, EditorStats } from '../types';
 import { BibliographicReference, CitationStyle } from '@openresearch/citations';
 
@@ -53,6 +57,7 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
   const onDismissClaim = props.onDismissClaim ?? handlers?.onDismissClaim;
   const onGhostTextRequest = props.onGhostTextRequest ?? handlers?.onGhostTextRequest;
   const onFocusChange = props.onFocusChange ?? handlers?.onFocusChange;
+  const onRegisterContinuationInserter = props.onRegisterContinuationInserter ?? handlers?.onRegisterContinuationInserter;
 
   const ghostTextTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const onSaveRef = useRef(onSave);
@@ -60,6 +65,7 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
   const onGhostTextRequestRef = useRef(onGhostTextRequest);
   const onTriggerContinuationRef = useRef(onTriggerContinuation);
   const onFocusChangeRef = useRef(onFocusChange);
+  const onRegisterContinuationInserterRef = useRef(onRegisterContinuationInserter);
   const previousCitationIdsRef = useRef<Set<string>>(new Set());
   const pendingSaveRef = useRef<{ json: JSONContent; text: string } | null>(null);
   const autoSaveEnabledRef = useRef(autoSaveEnabled);
@@ -71,6 +77,7 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
   const [citationQuery, setCitationQuery] = useState('');
   const [atSymbolPos, setAtSymbolPos] = useState<number | null>(null);
   const [paragraphContext, setParagraphContext] = useState('');
+  const [contextMenuPos, setContextMenuPos] = useState<{ x: number; y: number } | null>(null);
 
   useEffect(() => {
     onSaveRef.current = onSave;
@@ -91,6 +98,10 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
   useEffect(() => {
     onFocusChangeRef.current = onFocusChange;
   }, [onFocusChange]);
+
+  useEffect(() => {
+    onRegisterContinuationInserterRef.current = onRegisterContinuationInserter;
+  }, [onRegisterContinuationInserter]);
 
   useEffect(() => {
     autoSaveEnabledRef.current = autoSaveEnabled;
@@ -169,7 +180,11 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
           class: 'border border-border-default px-3 py-2 text-sm text-text-primary',
         },
       }),
+      TextStyle,
+      FontSize,
       CodeBlock.configure({
+        exitOnArrowDown: true,
+        exitOnTripleEnter: true,
         HTMLAttributes: {
           class: 'rounded bg-sunken border border-border-default p-3 font-mono text-xs my-3 overflow-x-auto text-text-primary',
         },
@@ -253,6 +268,72 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
           if (event.key === 'Escape') {
             setIsCitationPopoverOpen(false);
             setAtSymbolPos(null);
+            return true;
+          }
+        }
+
+        // Handle Mod-Enter / Mod-Shift-Enter to exit code blocks, tables, or blockquotes to change lines
+        if ((event.ctrlKey || event.metaKey) && event.key === 'Enter') {
+          const { state, dispatch } = view;
+          const { $from } = state.selection;
+
+          let blockDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d);
+            if (node.type.name === 'table' || node.type.name === 'codeBlock' || node.type.name === 'blockquote') {
+              blockDepth = d;
+              break;
+            }
+          }
+
+          if (blockDepth !== -1) {
+            event.preventDefault();
+            if (event.shiftKey) {
+              // Insert paragraph before block
+              const beforePos = $from.before(blockDepth);
+              const paragraphNode = state.schema.nodes.paragraph.create();
+              const tr = state.tr.insert(beforePos, paragraphNode);
+              const resolvedPos = tr.doc.resolve(beforePos + 1);
+              tr.setSelection(TextSelection.near(resolvedPos));
+              dispatch(tr.scrollIntoView());
+            } else {
+              // Insert paragraph after block
+              const afterPos = $from.after(blockDepth);
+              const paragraphNode = state.schema.nodes.paragraph.create();
+              const tr = state.tr.insert(afterPos, paragraphNode);
+              const resolvedPos = tr.doc.resolve(afterPos + 1);
+              tr.setSelection(TextSelection.near(resolvedPos));
+              dispatch(tr.scrollIntoView());
+            }
+            return true;
+          }
+        }
+
+        // Handle ArrowDown when trapped at document end inside a table or codeBlock
+        if (event.key === 'ArrowDown' && !event.ctrlKey && !event.metaKey && !event.altKey && !event.shiftKey) {
+          const { state, dispatch } = view;
+          const { $from } = state.selection;
+          const isAtDocEnd = $from.pos >= state.doc.content.size - 2;
+
+          let inBlock = false;
+          let blockDepth = -1;
+          for (let d = $from.depth; d > 0; d--) {
+            const node = $from.node(d);
+            if (node.type.name === 'table' || node.type.name === 'codeBlock') {
+              inBlock = true;
+              blockDepth = d;
+              break;
+            }
+          }
+
+          if (inBlock && isAtDocEnd) {
+            event.preventDefault();
+            const afterPos = $from.after(blockDepth);
+            const paragraphNode = state.schema.nodes.paragraph.create();
+            const tr = state.tr.insert(afterPos, paragraphNode);
+            const resolvedPos = tr.doc.resolve(afterPos + 1);
+            tr.setSelection(TextSelection.near(resolvedPos));
+            dispatch(tr.scrollIntoView());
             return true;
           }
         }
@@ -342,6 +423,22 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
       }
     },
   });
+
+  // Register inline inserter so Workspace continuation Accept inserts at cursor, not at doc end
+  useEffect(() => {
+    if (!editor || !onRegisterContinuationInserterRef.current) return;
+    const inserter = (text: string): boolean => {
+      try {
+        return editor.chain().focus().insertContent(text).run();
+      } catch {
+        return false;
+      }
+    };
+    onRegisterContinuationInserterRef.current(inserter);
+    return () => {
+      onRegisterContinuationInserterRef.current?.(null as unknown as (text: string) => boolean);
+    };
+  }, [editor]);
 
   // Handle inserting selected citation from popover
   const handleSelectCitation = useCallback(
@@ -446,6 +543,20 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
         return;
       }
 
+      // If clicked in the empty space below content or outside prose text
+      if (editor) {
+        const proseEl = (e.currentTarget as HTMLElement).querySelector('.ProseMirror');
+        if (proseEl && (!proseEl.contains(target) || target === proseEl)) {
+          const doc = editor.state.doc;
+          const lastChild = doc.lastChild;
+          if (lastChild && (lastChild.type.name === 'table' || lastChild.type.name === 'codeBlock' || lastChild.type.name === 'blockquote')) {
+            editor.chain().focus('end').insertContentAt(doc.content.size, { type: 'paragraph' }).run();
+          } else {
+            editor.chain().focus('end').run();
+          }
+        }
+      }
+
       // Clicking anywhere else in the document dismisses the citation popover
       if (isCitationPopoverOpen) {
         setIsCitationPopoverOpen(false);
@@ -453,7 +564,7 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
         setCitationQuery('');
       }
     },
-    [onInspectSource, isCitationPopoverOpen]
+    [editor, onInspectSource, isCitationPopoverOpen]
   );
 
   // Explicit Save Shortcut (Ctrl+S / Cmd+S)
@@ -519,8 +630,61 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
     [editor, onTriggerAIEdit]
   );
 
+  const handleInsertParagraphAfterTable = useCallback(() => {
+    if (!editor) return;
+    const { state, dispatch } = editor.view;
+    const { $from } = state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        const afterPos = $from.after(d);
+        const paragraphNode = state.schema.nodes.paragraph.create();
+        const tr = state.tr.insert(afterPos, paragraphNode);
+        const resolvedPos = tr.doc.resolve(afterPos + 1);
+        tr.setSelection(TextSelection.near(resolvedPos));
+        dispatch(tr.scrollIntoView());
+        editor.commands.focus();
+        break;
+      }
+    }
+  }, [editor]);
+
+  const handleInsertParagraphBeforeTable = useCallback(() => {
+    if (!editor) return;
+    const { state, dispatch } = editor.view;
+    const { $from } = state.selection;
+    for (let d = $from.depth; d > 0; d--) {
+      if ($from.node(d).type.name === 'table') {
+        const beforePos = $from.before(d);
+        const paragraphNode = state.schema.nodes.paragraph.create();
+        const tr = state.tr.insert(beforePos, paragraphNode);
+        const resolvedPos = tr.doc.resolve(beforePos + 1);
+        tr.setSelection(TextSelection.near(resolvedPos));
+        dispatch(tr.scrollIntoView());
+        editor.commands.focus();
+        break;
+      }
+    }
+  }, [editor]);
+
+  const handleContextMenu = useCallback(
+    (e: React.MouseEvent<HTMLDivElement>) => {
+      const target = e.target as HTMLElement;
+      const tableEl = target.closest('table, td, th, [data-type="table"]');
+      if (tableEl && editor) {
+        e.preventDefault();
+        setContextMenuPos({ x: e.clientX, y: e.clientY });
+      } else {
+        setContextMenuPos(null);
+      }
+    },
+    [editor]
+  );
+
   return (
-    <div className={`flex flex-col w-full bg-surface rounded border border-border-default shadow-sm overflow-hidden relative ${className}`}>
+    <div
+      className={`flex flex-col w-full bg-surface rounded border border-border-default shadow-sm relative ${className}`}
+      onContextMenu={handleContextMenu}
+    >
       <EditorToolbar
         editor={editor}
         onTriggerContinuation={handleToolbarContinuation}
@@ -529,9 +693,60 @@ export const AcademicEditor: React.FC<AcademicEditorProps> = (props) => {
         onOpenExportModal={onOpenExportModal}
       />
 
-      <div className="p-6 md:p-10 overflow-y-auto" onClick={handleEditorClick}>
+      <div className="p-6 md:p-10 cursor-text" onClick={handleEditorClick}>
         <EditorContent editor={editor} />
       </div>
+
+      {/* Contextual Table Helper Bar */}
+      {editor?.isActive('table') && (
+        <div className="sticky bottom-3 z-20 mx-auto mb-2 flex items-center gap-1.5 rounded-full border border-border-default bg-surface/95 px-3.5 py-1.5 shadow-lg backdrop-blur-sm text-xs animate-in fade-in slide-in-from-bottom-2">
+          <span className="text-[10px] font-semibold text-text-tertiary uppercase tracking-wider mr-1">Table</span>
+          <button
+            type="button"
+            onClick={handleInsertParagraphAfterTable}
+            className="flex items-center gap-1.5 px-2.5 py-1 rounded-full bg-accent text-accent-solid-fg hover:bg-accent-hover font-medium transition-colors shadow-2xs cursor-pointer"
+            title="Exit table and write below (Ctrl+Enter)"
+          >
+            <ArrowDown className="w-3.5 h-3.5" />
+            <span>Write Line Below</span>
+            <kbd className="text-[9px] font-mono px-1 py-0.5 rounded bg-black/15 text-white/90">Ctrl+Enter</kbd>
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().addRowAfter().run()}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+          >
+            <Rows className="w-3.5 h-3.5" />
+            <span>+ Row</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().addColumnAfter().run()}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-sunken text-text-secondary hover:text-text-primary transition-colors cursor-pointer"
+          >
+            <Columns className="w-3.5 h-3.5" />
+            <span>+ Col</span>
+          </button>
+          <div className="h-3.5 w-px bg-border-default mx-0.5" />
+          <button
+            type="button"
+            onClick={() => editor.chain().focus().deleteTable().run()}
+            className="flex items-center gap-1 px-2 py-1 rounded hover:bg-trust-danger/10 text-trust-danger transition-colors cursor-pointer"
+          >
+            <Trash2 className="w-3.5 h-3.5" />
+            <span>Delete</span>
+          </button>
+        </div>
+      )}
+
+      {/* Right-Click Table Context Menu */}
+      <TableContextMenu
+        editor={editor}
+        position={contextMenuPos}
+        onClose={() => setContextMenuPos(null)}
+        onInsertParagraphAfter={handleInsertParagraphAfterTable}
+        onInsertParagraphBefore={handleInsertParagraphBeforeTable}
+      />
 
       {/* @-Triggered Inline Citation Popover */}
       <CitationPopover

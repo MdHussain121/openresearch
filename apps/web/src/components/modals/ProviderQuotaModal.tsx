@@ -110,7 +110,7 @@ export const ProviderQuotaModal: React.FC<ProviderStatusModalProps> = ({ isOpen,
         {/* Content */}
         <div className="p-6 space-y-5">
           {/* Cache Stats Summary */}
-          <div className="grid grid-cols-3 gap-3 p-4 bg-sunken rounded-lg border border-border-default">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 p-4 bg-sunken rounded-lg border border-border-default">
             <div>
               <span className="text-[11px] font-semibold text-text-secondary uppercase tracking-wider">
                 Cached Queries
@@ -125,7 +125,7 @@ export const ProviderQuotaModal: React.FC<ProviderStatusModalProps> = ({ isOpen,
                 {Math.round(overallHitRate * 100)}%
               </p>
             </div>
-            <div className="flex items-center justify-end">
+            <div className="flex items-center sm:justify-end">
               <button
                 type="button"
                 onClick={handleClearCache}
@@ -139,7 +139,7 @@ export const ProviderQuotaModal: React.FC<ProviderStatusModalProps> = ({ isOpen,
           </div>
 
           {/* Providers Table */}
-          <div className="border border-border-default rounded-lg overflow-hidden">
+          <div className="border border-border-default rounded-lg overflow-x-auto">
             <table className="w-full text-xs text-left">
               <thead className="bg-sunken text-text-secondary font-semibold border-b border-border-default">
                 <tr>

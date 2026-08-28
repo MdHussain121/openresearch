@@ -7,7 +7,10 @@ import { CitationNode } from './citation';
 import { MathEquation } from './math';
 import { TrustMarker } from './trustMarker';
 import { ClaimVerificationMark } from './claimVerification';
+import { Editor } from '@tiptap/core';
+import StarterKit from '@tiptap/starter-kit';
 import { GhostText, ghostTextPluginKey, GhostTextState, createGhostTextSpan } from './ghostText';
+import { TextStyle, FontSize } from './fontSize';
 
 // Runtime string key of the PluginKey (not exposed in public TS types).
 const GHOST_PLUGIN_KEY = (ghostTextPluginKey as unknown as { key: string }).key;
@@ -1197,4 +1200,84 @@ it('handles a ghost-text source list containing an undefined entry', () => {
   );
   expect(span.querySelector('.source-preview-badge')).toBeNull();
   expect(inspect).not.toHaveBeenCalled();
+});
+
+describe('TextStyle and FontSize extensions', () => {
+  it('has correct names', () => {
+    expect(TextStyle.name).toBe('textStyle');
+    expect(FontSize.name).toBe('fontSize');
+  });
+
+  it('FontSize defines global fontSize attribute', () => {
+    const ext = FontSize as unknown as ExtensionLike;
+    const globalAttrs = callMethod<Array<{ types: string[]; attributes: Record<string, AttributeSpec & { renderHTML?: (a: any) => any }> }>>(
+      ext,
+      'addGlobalAttributes'
+    );
+    expect(globalAttrs).toBeDefined();
+    expect(globalAttrs[0].types).toContain('textStyle');
+    const attr = globalAttrs[0].attributes.fontSize;
+    expect(attr).toBeDefined();
+    expect(attr.default).toBeNull();
+
+    // parseHTML
+    const el1 = { style: { fontSize: '20px' }, getAttribute: () => null } as unknown as HTMLElement;
+    expect(attr.parseHTML!(el1)).toBe('20px');
+
+    const el2 = { style: {}, getAttribute: (n: string) => (n === 'data-font-size' ? '18px' : null) } as unknown as HTMLElement;
+    expect(attr.parseHTML!(el2)).toBe('18px');
+
+    // renderHTML
+    expect(attr.renderHTML!({ fontSize: '18px' })).toEqual({
+      style: 'font-size: 18px',
+      'data-font-size': '18px',
+    });
+    expect(attr.renderHTML!({ fontSize: null })).toEqual({});
+  });
+
+  it('FontSize adds setFontSize and unsetFontSize commands', () => {
+    const ext = FontSize as unknown as ExtensionLike;
+    const commands = callMethod<Record<string, (arg?: any) => (ctx: any) => boolean>>(
+      ext,
+      'addCommands'
+    );
+    expect(typeof commands.setFontSize).toBe('function');
+    expect(typeof commands.unsetFontSize).toBe('function');
+  });
+
+  it('applies and unsets fontSize mark in a real Tiptap editor instance', () => {
+    const editor = new Editor({
+      extensions: [StarterKit, FontSize, TextStyle],
+      content: '<p>Hello world</p>',
+    });
+
+    // Select "world" (positions 7 to 12)
+    editor.commands.setTextSelection({ from: 7, to: 12 });
+    editor.commands.setFontSize('24px');
+
+    const html = editor.getHTML();
+    expect(html).toContain('font-size: 24px');
+    expect(html).toContain('data-font-size="24px"');
+
+    // Unset fontSize on selection
+    editor.commands.setTextSelection({ from: 7, to: 12 });
+    editor.commands.unsetFontSize();
+    const updatedHtml = editor.getHTML();
+    expect(updatedHtml).not.toContain('font-size: 24px');
+    expect(updatedHtml).toContain('Hello world');
+  });
+
+  it('supports applying arbitrary custom font size values', () => {
+    const editor = new Editor({
+      extensions: [StarterKit, FontSize, TextStyle],
+      content: '<p>Custom font size test</p>',
+    });
+
+    // Select "Custom" (positions 1 to 7)
+    editor.commands.setTextSelection({ from: 1, to: 7 });
+    editor.commands.setFontSize('21.5px');
+
+    expect(editor.getHTML()).toContain('font-size: 21.5px');
+    expect(editor.getHTML()).toContain('data-font-size="21.5px"');
+  });
 });

@@ -142,6 +142,17 @@ class IdentifierResolver:
         except (httpx.HTTPError, ValueError) as exc:
             logger.warning("Crossref resolution failed for DOI %s: %s", doi, exc)
 
+        # DataCite arXiv DOI fallback: 10.48550/arXiv.YYMM.NNNNN[vN] -> extract and query arXiv
+        m = re.search(r"10\.48550/arXiv\.(\d{4}\.\d{4,5})(v\d+)?", doi, flags=re.IGNORECASE)
+        if m:
+            arxiv_id = m.group(1)  # e.g., "2501.09136"
+            logger.info("Crossref miss for DataCite DOI %s, falling back to arXiv %s", doi, arxiv_id)
+            arxiv_meta = await self.resolve_arxiv(arxiv_id)
+            if arxiv_meta.get("extraction_status") == "ok":
+                arxiv_meta["doi"] = doi  # preserve original DOI
+                arxiv_meta["id_type"] = "doi"  # preserve requested type
+                return arxiv_meta
+
         return self._unresolved(
             identifier=doi,
             id_type="doi",
@@ -179,7 +190,7 @@ class IdentifierResolver:
             return cached
         try:
             client = get_async_http_client()
-            url = f"http://export.arxiv.org/api/query?id_list={clean_id}"
+            url = f"https://export.arxiv.org/api/query?id_list={clean_id}"
             resp = await client.get(url, timeout=settings.IDENTIFIER_RESOLVER_TIMEOUT_SECONDS)
             if resp.status_code == 200 and "<entry>" in resp.text:
                 content = resp.text

@@ -18,6 +18,7 @@ import { t } from '../../i18n';
 import { paperToBibRef } from '../../lib/paperToBibRef';
 import { api } from '../../lib/api';
 import type { GroundedPassage, GroundingState } from '@openresearch/ai';
+import { Tooltip, TooltipTrigger, TooltipContent } from '@openresearch/ui';
 import { BibliographicReference } from '@openresearch/citations';
 
 export const DocumentsView: React.FC = () => {
@@ -91,9 +92,9 @@ export const DocumentsView: React.FC = () => {
   );
 
   return (
-    <div className="flex-1 overflow-y-auto px-4 md:px-8 py-6 flex justify-center">
-      {/* 720px Centered Editor Column (UI/UX §3.2) */}
-      <div className="w-full max-w-[var(--editor-max-width)] space-y-4">
+    <div className="flex-1 overflow-y-auto px-4 sm:px-6 lg:px-10 pt-0 pb-16 flex justify-center">
+      {/* 960px Expanded Centered Editor Canvas */}
+      <div className="w-full max-w-[var(--editor-max-width)] space-y-4 pt-6">
         {/* Document Header & Metadata Bar */}
         <div className="border-b border-border-default pb-3 space-y-2">
           <div className="flex items-center justify-between text-xs text-text-tertiary">
@@ -106,55 +107,71 @@ export const DocumentsView: React.FC = () => {
             </div>
             <div className="flex items-center space-x-2">
               {/* Comments Toggle Button */}
-              <button
-                onClick={w.toggleComments}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded border text-xs font-medium transition-colors ${
-                  w.isCommentsOpen
-                    ? 'bg-accent text-accent-solid-fg border-accent'
-                    : 'bg-surface border-border-default text-text-primary hover:bg-sunken'
-                }`}
-                title="Document comments & threaded discussions"
-              >
-                <MessageSquare className="w-3.5 h-3.5" />
-                <span>Comments</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={w.toggleComments}
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded border text-xs font-medium transition-colors ${
+                      w.isCommentsOpen
+                        ? 'bg-accent text-accent-solid-fg border-accent'
+                        : 'bg-surface border-border-default text-text-primary hover:bg-sunken'
+                    }`}
+                  >
+                    <MessageSquare className="w-3.5 h-3.5" />
+                    <span>Comments</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Document comments & threaded discussions</TooltipContent>
+              </Tooltip>
 
               {/* Version History Button */}
-              <button
-                onClick={w.openVersionHistory}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-surface hover:bg-sunken border border-border-default text-text-primary text-xs font-medium transition-colors"
-                title="Document revision history & visual diffs"
-              >
-                <History className="w-3.5 h-3.5 text-accent" />
-                <span>History</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={w.openVersionHistory}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-surface hover:bg-sunken border border-border-default text-text-primary text-xs font-medium transition-colors"
+                  >
+                    <History className="w-3.5 h-3.5 text-accent" />
+                    <span>History</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Document revision history & visual diffs</TooltipContent>
+              </Tooltip>
 
               {/* Claim Verification Badge Action */}
-              <button
-                onClick={() => {
-                  w.setSourcePanelCollapsed(false);
-                }}
-                className={`flex items-center space-x-1 px-2.5 py-1 rounded border text-xs font-medium transition-colors ${
-                  w.unsupportedClaimsCount > 0
-                    ? 'bg-trust-warning/10 border-trust-warning/30 text-trust-warning hover:bg-trust-warning/20'
-                    : 'bg-surface border-border-default text-text-secondary hover:bg-sunken'
-                }`}
-                title="Inspect empirical assertions & claim verification flags"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                <span>
-                  {w.unsupportedClaimsCount > 0 ? `${w.unsupportedClaimsCount} claims` : 'Claims verified'}
-                </span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={() => {
+                      w.setSourcePanelCollapsed(false);
+                    }}
+                    className={`flex items-center space-x-1 px-2.5 py-1 rounded border text-xs font-medium transition-colors ${
+                      w.unsupportedClaimsCount > 0
+                        ? 'bg-trust-warning/10 border-trust-warning/30 text-trust-warning hover:bg-trust-warning/20'
+                        : 'bg-surface border-border-default text-text-secondary hover:bg-sunken'
+                    }`}
+                  >
+                    <ShieldAlert className="w-3.5 h-3.5" />
+                    <span>
+                      {w.unsupportedClaimsCount > 0 ? `${w.unsupportedClaimsCount} claims` : 'Claims verified'}
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Inspect empirical assertions & claim verification flags</TooltipContent>
+              </Tooltip>
 
-              <button
-                onClick={w.openExportModal}
-                className="flex items-center space-x-1 px-2.5 py-1 rounded bg-surface hover:bg-sunken border border-border-default text-text-primary text-xs font-medium focus-visible:ring-2 focus-visible:ring-accent transition-colors"
-                title="Export Document (.docx, .pdf, .md, .bib) (Ctrl+E)"
-              >
-                <Download className="w-3.5 h-3.5 text-accent" />
-                <span>Export</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    onClick={w.openExportModal}
+                    className="flex items-center space-x-1 px-2.5 py-1 rounded bg-surface hover:bg-sunken border border-border-default text-text-primary text-xs font-medium focus-visible:ring-2 focus-visible:ring-accent transition-colors"
+                  >
+                    <Download className="w-3.5 h-3.5 text-accent" />
+                    <span>Export</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent>Export Document (.docx, .pdf, .md, .bib) (Ctrl+E)</TooltipContent>
+              </Tooltip>
             </div>
           </div>
 
@@ -205,6 +222,7 @@ export const DocumentsView: React.FC = () => {
           onOpenExportModal={w.openExportModal}
           onGhostTextRequest={handleGhostTextRequest}
           onFocusChange={w.setIsEditorFocused}
+          onRegisterContinuationInserter={w.registerContinuationInserter}
           onInspectClaim={(_claimId: string, _text: string, _suggestedQuery?: string) => {
             w.setSourcePanelCollapsed(false);
           }}

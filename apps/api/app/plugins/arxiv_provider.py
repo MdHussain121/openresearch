@@ -23,7 +23,7 @@ def on_paper_extract(payload: dict, config: dict | None) -> dict:
     match = _ARXIV_NEW_STYLE.search(str(candidate))
     if not match:
         raw_doi = str(result.get("doi") or "")
-        if raw_doi.startswith("10.48550/arXiv."):
+        if raw_doi.lower().startswith("10.48550/arxiv."):
             match = _ARXIV_NEW_STYLE.search(raw_doi)
 
     result.setdefault("source", "arxiv")

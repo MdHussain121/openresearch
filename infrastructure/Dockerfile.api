@@ -18,7 +18,12 @@ RUN pip wheel --wheel-dir /wheels -r requirements.txt
 FROM python:${PYTHON_VERSION}-slim-bookworm AS runtime
 
 RUN groupadd --system --gid 1001 python \
- && useradd --system --uid 1001 --gid python --home-dir /app apiuser
+ && useradd --system --uid 1001 --gid python --home-dir /app apiuser \
+ && apt-get update && apt-get install -y \
+    tesseract-ocr \
+    tesseract-ocr-eng \
+    poppler-utils \
+ && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app/apps/api
 

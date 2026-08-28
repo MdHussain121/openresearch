@@ -32,14 +32,6 @@ def test_local_mode_requests_without_token_are_accepted(client: TestClient):
         ("GET", "/api/v1/projects/proj-123"),
         ("PATCH", "/api/v1/projects/proj-123"),
         ("DELETE", "/api/v1/projects/proj-123"),
-        # Teams
-        ("GET", "/api/v1/teams"),
-        ("POST", "/api/v1/teams"),
-        ("GET", "/api/v1/teams/team-123"),
-        ("PATCH", "/api/v1/teams/team-123"),
-        ("DELETE", "/api/v1/teams/team-123"),
-        ("GET", "/api/v1/teams/team-123/members"),
-        ("POST", "/api/v1/teams/team-123/members"),
         # Version history
         ("GET", "/api/v1/documents/doc-123/versions"),
         ("POST", "/api/v1/documents/doc-123/versions"),
