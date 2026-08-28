@@ -15,7 +15,7 @@
     "@openresearch/ai": "*",
     "@tiptap/core": "^2.3.1",
     "@tiptap/react": "^2.3.1",
-    "@tiptap/pm": "^2.3.1",
+    "@tiptap/pm": "^3.30.3",
     "@tiptap/starter-kit": "^2.3.1",
     "@tiptap/extension-underline": "^2.3.1",
     "@tiptap/extension-link": "^2.3.1",
