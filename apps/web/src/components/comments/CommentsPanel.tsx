@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect, useCallback } from 'react';
 import { api, CommentDTO } from '../../lib/api';
-import { useAuth } from '../../context/AuthContext';
 import { t } from '../../i18n';
 import {
   MessageSquare,
@@ -28,7 +27,6 @@ export const CommentsPanel: React.FC<CommentsPanelProps> = ({
   isOpen,
   onClose,
 }) => {
-  const { user, isAuthenticated } = useAuth();
   const [comments, setComments] = useState<CommentDTO[]>([]);
   const [filter, setFilter] = useState<'all' | 'active' | 'resolved'>('active');
   const [newCommentText, setNewCommentText] = useState('');

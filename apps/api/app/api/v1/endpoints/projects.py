@@ -1,6 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_project_access
 from app.core.database import get_db
 from app.models.membership import Membership
 from app.models.owner import Owner
@@ -21,7 +22,10 @@ def create_project(
 ) -> Project:
     target_owner_id = project_in.owner_id or owner_id or current_user.personal_owner_id
 
-    # Verify user access to owner
+    owner = db.query(Owner).filter(Owner.id == target_owner_id).first()
+    if not owner:
+        raise HTTPException(status_code=404, detail="Owner not found")
+
     if not verify_user_access_to_owner(
         db, current_user.id, target_owner_id, required_roles=["owner", "editor"]
     ):
@@ -29,10 +33,6 @@ def create_project(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to create projects under this owner",
         )
-
-    owner = db.query(Owner).filter(Owner.id == target_owner_id).first()
-    if not owner:
-        raise HTTPException(status_code=404, detail="Owner not found")
 
     project = Project(
         owner_id=target_owner_id, name=project_in.name, description=project_in.description
@@ -75,17 +75,12 @@ def list_projects(
 
 @router.get("/projects/{project_id}", response_model=ProjectResponse)
 def get_project(
-    project_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> Project:
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="You do not have access to this project"
-        )
-    return project
+    return _project
 
 
 @router.patch("/projects/{project_id}", response_model=ProjectResponse)
@@ -94,18 +89,11 @@ def update_project(
     project_in: ProjectUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> Project:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    if not verify_user_access_to_owner(
-        db, current_user.id, project.owner_id, required_roles=["owner", "editor"]
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to update this project",
-        )
 
     if project_in.name is not None:
         project.name = project_in.name
@@ -119,18 +107,14 @@ def update_project(
 
 @router.delete("/projects/{project_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_project(
-    project_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    project_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> None:
     project = db.query(Project).filter(Project.id == project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
-    if not verify_user_access_to_owner(
-        db, current_user.id, project.owner_id, required_roles=["owner"]
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN, detail="Only owner role can delete this project"
-        )
 
     db.delete(project)
     db.commit()

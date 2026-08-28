@@ -5,6 +5,7 @@ from typing import Any
 import httpx
 
 from app.core.authors import split_full_name
+from app.core.config import settings
 from app.core.http_client import get_async_http_client
 from app.services.provider_cache_service import provider_cache_service
 
@@ -82,7 +83,7 @@ class IdentifierResolver:
         try:
             client = get_async_http_client()
             url = f"https://api.crossref.org/works/{doi}"
-            resp = await client.get(url, headers=headers, timeout=8.0)
+            resp = await client.get(url, headers=headers, timeout=settings.IDENTIFIER_RESOLVER_TIMEOUT_SECONDS)
             if resp.status_code == 200:
                 data = resp.json().get("message", {})
                 title = "Untitled"
@@ -179,7 +180,7 @@ class IdentifierResolver:
         try:
             client = get_async_http_client()
             url = f"http://export.arxiv.org/api/query?id_list={clean_id}"
-            resp = await client.get(url, timeout=8.0)
+            resp = await client.get(url, timeout=settings.IDENTIFIER_RESOLVER_TIMEOUT_SECONDS)
             if resp.status_code == 200 and "<entry>" in resp.text:
                 content = resp.text
                 title_m = re.search(r"<title>([\s\S]*?)</title>", content)
@@ -252,7 +253,7 @@ class IdentifierResolver:
         try:
             client = get_async_http_client()
             url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/esummary.fcgi?db=pubmed&id={pmid}&retmode=json"
-            resp = await client.get(url, timeout=8.0)
+            resp = await client.get(url, timeout=settings.IDENTIFIER_RESOLVER_TIMEOUT_SECONDS)
             if resp.status_code == 200:
                 data = resp.json().get("result", {}).get(pmid, {})
                 title = data.get("title", f"PubMed Article ({pmid})").rstrip(".")

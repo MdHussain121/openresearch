@@ -76,7 +76,7 @@ class LLMService:
         try:
             with self._http_semaphore:
                 client = get_sync_http_client()
-                resp = client.get(f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags", timeout=2.0)
+                resp = client.get(f"{settings.OLLAMA_BASE_URL.rstrip('/')}/api/tags", timeout=settings.TABBY_PROBE_TIMEOUT_SECONDS)
             self._available = resp.status_code == 200
         except Exception as exc:
             logger.warning("Ollama probe failed: %s", exc)
@@ -148,7 +148,7 @@ class LLMService:
         try:
             with self._http_semaphore:
                 client = get_sync_http_client()
-                resp = client.get(f"{base_url}/v1/health", timeout=2.0)
+                resp = client.get(f"{base_url}/v1/health", timeout=settings.TABBY_PROBE_TIMEOUT_SECONDS)
             self._tabby_available = resp.status_code == 200
         except Exception as exc:
             logger.warning("Tabby probe failed: %s", exc)
@@ -180,7 +180,7 @@ class LLMService:
         prefix: str,
         suffix: str = "",
         max_tokens: int = 32,
-        timeout_seconds: float = 3.0,
+        timeout_seconds: float = settings.TABBY_COMPLETION_TIMEOUT_SECONDS,
     ) -> str | None:
         """
         One-shot completion from the local Tabby server. Returns None when Tabby

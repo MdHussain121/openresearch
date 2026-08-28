@@ -57,6 +57,39 @@ class TokenData(BaseModel):
     email: str | None = None
 
 
+class ForgotPasswordRequest(BaseModel):
+    email: EmailStr
+
+
+class ForgotPasswordResponse(BaseModel):
+    message: str
+    # In development, the reset token is included in the response.
+    # In production, this should be emailed and omitted from the response.
+    reset_token: str | None = None
+
+
+class ResetPasswordRequest(BaseModel):
+    token: str
+    new_password: str = Field(
+        min_length=8, max_length=128, description="New password must be between 8 and 128 characters"
+    )
+
+    @field_validator("new_password")
+    @classmethod
+    def validate_password_complexity(cls, v: str) -> str:
+        if not re.search(r"[a-z]", v):
+            raise ValueError("Password must contain at least one lowercase letter")
+        if not re.search(r"[A-Z]", v):
+            raise ValueError("Password must contain at least one uppercase letter")
+        if not re.search(r"\d", v):
+            raise ValueError("Password must contain at least one digit")
+        return v
+
+
+class ResetPasswordResponse(BaseModel):
+    message: str
+
+
 class OwnerResponse(BaseModel):
     id: str
     owner_type: str

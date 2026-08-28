@@ -1,7 +1,7 @@
 # OpenResearch
 
 > **Open-Source AI Academic Research & Writing Assistant**  
-> A privacy-first, local-first platform for literature discovery, grounded research analysis, and academic writing.
+> A privacy-first, local-first, offline-first platform for literature discovery, grounded research analysis, and academic writing. No login required — runs entirely on your machine.
 
 ---
 
@@ -106,7 +106,7 @@ npm run dev:web
 | Variable | Default | Description |
 | :--- | :--- | :--- |
 | `ENVIRONMENT` | `development` | `development`, `production`, or `test`. |
-| `SECRET_KEY` | *(dev key)* | JWT secret key. Must be ≥32 characters in production. |
+| `SECRET_KEY` | *(dev key)* | *(deprecated — auth removed, auto-generated if missing)* |
 | `DATABASE_URL` | `sqlite:///./openresearch_dev.db` | SQLAlchemy database URL. |
 | `REDIS_URL` | `redis://localhost:6379/0` | Redis instance URL. |
 | `CORS_ORIGINS` | `http://localhost:3000,http://127.0.0.1:3000` | Allowed CORS origins. |
@@ -118,8 +118,8 @@ npm run dev:web
 | `TABBY_BASE_URL` / `TABBY_MODEL` / `TABBY_AUTOCOMPLETE_ENABLED` | `http://localhost:8080` / `Qwen2.5-Coder-1.5B` / `false` | Inline autocomplete server (off by default). |
 | `LLM_TIMEOUT_SECONDS` | `20` | LLM request timeout in seconds. |
 | `LLM_MAX_CONTEXT_CHARS` / `LLM_MAX_TOKENS` | `12000` / `1200` | LLM context size / max output tokens. |
-| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_MINUTES` | `1440` / `43200` | JWT token lifetimes in minutes. |
-| `LOGIN_RATE_LIMIT_MAX_REQUESTS` / `REGISTER_RATE_LIMIT_MAX_REQUESTS` | `10` / `20` | Auth rate limits per window. |
+| `ACCESS_TOKEN_EXPIRE_MINUTES` / `REFRESH_TOKEN_EXPIRE_MINUTES` | `1440` / `43200` | *(deprecated — auth removed, kept for compat)* |
+| `LOGIN_RATE_LIMIT_MAX_REQUESTS` / `REGISTER_RATE_LIMIT_MAX_REQUESTS` | `10` / `20` | *(deprecated — auth removed)* |
 | `ALLOWED_DEV_ORIGINS` | *(empty)* | Comma-separated extra origins allowed by the Next.js dev server. |
 | `NEXT_PUBLIC_API_URL` | `http://localhost:8000/api/v1` | Public API endpoint for Web client. |
 

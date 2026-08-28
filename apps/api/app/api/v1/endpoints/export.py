@@ -4,13 +4,14 @@ from fastapi import APIRouter, Depends, HTTPException, Query, Response
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_document_access
 from app.core.database import get_db
 from app.models.citation import Citation
 from app.models.document import Document
 from app.models.paper import Paper
 from app.models.user import User
 from app.schemas.models import ExportRequest
-from app.services.auth import get_current_user, verify_user_access_to_owner
+from app.services.auth import get_current_user
 from app.services.export_service import export_service
 
 router = APIRouter()
@@ -27,18 +28,12 @@ def export_document_post(
     payload: ExportRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> Response:
     """
     Export a research document to DOCX, PDF, Markdown, or BibTeX format.
     Preserves document structure, citations, math equations, tables, and bibliography.
     """
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     citations = (
         db.query(Citation)
         .filter(Citation.document_id == document_id)
@@ -86,17 +81,11 @@ def export_document_get(
     trust: bool = Query(True, description="Include trust marker footnotes"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> Response:
     """
     Direct GET download URL for document export in specified format.
     """
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     citations = (
         db.query(Citation)
         .filter(Citation.document_id == document_id)

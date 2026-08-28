@@ -24,6 +24,7 @@ from app.core.database import get_db
 from app.models.annotation import PaperAnnotation
 from app.models.chunk import PaperChunk
 from app.models.paper import Paper
+from app.models.project import Project
 from app.models.user import User
 from app.schemas.models import (
     AnnotationCreate,
@@ -36,7 +37,7 @@ from app.schemas.models import (
     PaperResponse,
     PaperStatusResponse,
 )
-from app.services.auth import get_current_user
+from app.services.auth import get_current_user, verify_user_access_to_owner
 from app.services.pdf_extractor import PDFExtractionError, PDFValidator, pdf_extractor
 from app.services.rag_service import rag_service
 
@@ -64,7 +65,7 @@ async def upload_paper(
     file: UploadFile = File(...),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-    _project: Project = Depends(require_project_access(project_id, roles=["owner", "editor"])),
+    _project: Project = Depends(require_project_access),
 ) -> Paper:
     """
     Upload and extract PDF paper:

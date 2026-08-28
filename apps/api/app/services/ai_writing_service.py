@@ -93,7 +93,11 @@ class AIWritingService:
 
     def _generate_tabby_autocomplete(self, prefix: str, suffix: str, mode: str) -> str | None:
         max_tokens = 48 if mode == "ghost" else 160
-        timeout = 3.0 if mode == "ghost" else 6.0
+        timeout = (
+            settings.AI_WRITING_GHOST_TIMEOUT_SECONDS
+            if mode == "ghost"
+            else settings.AI_WRITING_DEFAULT_TIMEOUT_SECONDS
+        )
         return llm_service.generate_tabby(
             prefix=prefix, suffix=suffix, max_tokens=max_tokens, timeout_seconds=timeout
         )

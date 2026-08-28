@@ -99,6 +99,30 @@ class Settings(BaseSettings):
     LLM_MAX_CONTEXT_CHARS: int = 12000
     LLM_MAX_TOKENS: int = 1200
 
+    # External service timeouts (seconds)
+    GROBID_TIMEOUT_SECONDS: int = 30
+    ZOTERO_TIMEOUT_SECONDS: int = 10
+    IDENTIFIER_RESOLVER_TIMEOUT_SECONDS: int = 8
+    GRAPH_SERVICE_TIMEOUT_SECONDS: int = 10
+    TABBY_PROBE_TIMEOUT_SECONDS: int = 2
+    TABBY_COMPLETION_TIMEOUT_SECONDS: int = 3
+    PROVIDER_SOCKET_TIMEOUT_SECONDS: float = 1.0
+    PROVIDER_SOCKET_CONNECT_TIMEOUT_SECONDS: float = 1.0
+    AI_WRITING_GHOST_TIMEOUT_SECONDS: float = 3.0
+    AI_WRITING_DEFAULT_TIMEOUT_SECONDS: float = 6.0
+
+    # Deprecated: authentication removed — kept for backwards compat, always ignored.
+    OPENRESEARCH_DEV_INSECURE_AUTH: bool = False
+
+    @field_validator("OPENRESEARCH_DEV_INSECURE_AUTH", mode="before")
+    @classmethod
+    def _coerce_dev_auth(cls, v: object) -> bool:
+        if isinstance(v, bool):
+            return v
+        if isinstance(v, str):
+            return v.strip() in ("1", "true", "True", "yes")
+        return bool(v)
+
     @model_validator(mode="before")
     @classmethod
     def resolve_legacy_aliases(cls, data: dict) -> dict:
@@ -111,38 +135,25 @@ class Settings(BaseSettings):
 
     @model_validator(mode="after")
     def validate_production_security(self) -> "Settings":
+        # Authentication removed: SECRET_KEY is no longer required. Kept for
+        # backwards compat with external LLM/JWT callers but never enforced.
+        # Auto-generate if missing so legacy JWT helpers still work if called.
         env_lower = self.ENVIRONMENT.strip().lower()
 
-        # Reject known compromised secrets in ALL environments
-        if self.SECRET_KEY in KNOWN_COMPROMISED_DEFAULT_SECRETS:
-            raise ValueError(
-                "SECURITY ERROR: SECRET_KEY is a publicly known default value. "
-                "Set a unique SECRET_KEY via environment variable or .env file."
-            )
+        # OPENRESEARCH_DEV_INSECURE_AUTH is deprecated and ignored.
 
         if env_lower == "production":
-            if not self.SECRET_KEY:
-                raise ValueError(
-                    "CRITICAL SECURITY ERROR: In production environment, SECRET_KEY must be provided."
-                )
-            if "change_me" in self.SECRET_KEY.lower():
-                raise ValueError(
-                    "CRITICAL SECURITY ERROR: Production SECRET_KEY must not contain 'change_me'."
-                )
-            if len(self.SECRET_KEY) < 32:
-                raise ValueError(
-                    "CRITICAL SECURITY ERROR: Production SECRET_KEY must be at least 32 characters long."
-                )
             if self.DATABASE_URL.strip().lower().startswith("sqlite"):
                 raise ValueError(
                     "CRITICAL CONFIGURATION ERROR: SQLite is not supported in production. "
                     "Set DATABASE_URL to a PostgreSQL connection string."
                 )
-        elif not self.SECRET_KEY:
-            # Auto-generate for dev/test so startup never uses a committed default
+        if not self.SECRET_KEY:
+            # Generate an ephemeral key so jwt.encode/decode don't crash if
+            # legacy code paths are still invoked.
             self.SECRET_KEY = secrets.token_urlsafe(48)
             logger.info(
-                "No SECRET_KEY provided; generated a random key for %s environment.",
+                "No SECRET_KEY provided; generated ephemeral key for %s environment (auth disabled).",
                 env_lower,
             )
 

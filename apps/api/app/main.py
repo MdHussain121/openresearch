@@ -27,6 +27,8 @@ from app.core.middleware import (
 
 logger = logging.getLogger("openresearch.startup")
 
+_tabby_thread: threading.Thread | None = None
+
 
 def _run_migrations() -> None:
     """Apply Alembic migrations to reach the latest schema (replaces ad-hoc create_all)."""
@@ -52,6 +54,21 @@ def _run_migrations() -> None:
         command.upgrade(alembic_cfg, "head")
 
 
+def _ensure_local_user() -> None:
+    """Ensure the local offline user exists so API works without login."""
+    try:
+        from app.core.database import SessionLocal
+        from app.services.auth import get_or_create_local_user
+
+        db = SessionLocal()
+        try:
+            get_or_create_local_user(db)
+        finally:
+            db.close()
+    except Exception:
+        logger.warning("Failed to ensure local user on startup", exc_info=True)
+
+
 def _start_tabby_if_enabled() -> None:
     """Fire-and-forget local Tabby launch; start_if_enabled no-ops unless autocomplete is on."""
     try:
@@ -73,11 +90,14 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     # concurrent migration runs across workers.
     setup_logging()
     await asyncio.to_thread(_run_migrations)
+    await asyncio.to_thread(_ensure_local_user)
     await init_http_client()
     if settings.ENVIRONMENT.strip().lower() != "test":
-        threading.Thread(
+        global _tabby_thread
+        _tabby_thread = threading.Thread(
             target=_start_tabby_if_enabled, name="tabby-autostart", daemon=True
-        ).start()
+        )
+        _tabby_thread.start()
     yield
     # Shutdown: cancel collaboration relay task, stop Tabby child, then close HTTP clients
     try:
@@ -93,6 +113,10 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         stop_server()
     except Exception:
         pass
+    if _tabby_thread is not None and _tabby_thread.is_alive():
+        _tabby_thread.join(timeout=5.0)
+        if _tabby_thread.is_alive():
+            logger.warning("Tabby thread did not terminate within timeout")
     await close_http_client()
 
 

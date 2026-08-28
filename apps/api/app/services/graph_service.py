@@ -8,6 +8,7 @@ from urllib.parse import quote_plus
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.constants import STOP_WORDS
 from app.core.http_client import get_async_http_client
 from app.models.paper import Paper
@@ -260,7 +261,7 @@ class ResearchGraphService:
                 + quote_plus(query)
                 + "&rows=8&sort=relevance&select=DOI,title,author,issued,abstract,is-referenced-by-count"
             )
-            resp = await client.get(url, timeout=10.0)
+            resp = await client.get(url, timeout=settings.GRAPH_SERVICE_TIMEOUT_SECONDS)
             if resp.status_code == 200:
                 items = resp.json().get("message", {}).get("items", []) or []
             else:

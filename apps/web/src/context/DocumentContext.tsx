@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { api } from '../lib/api';
-import { useAuth } from './AuthContext';
 import { useProject } from './ProjectContext';
 import type { EditorStats } from '@openresearch/editor';
 import { BibliographicReference, CitationStyle, CitationItem, AttributionScope } from '@openresearch/citations';
@@ -77,7 +76,6 @@ function isCitationNode(node: unknown): node is { type: 'citation'; attrs: { pap
 }
 
 export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { isOfflineMode, isAuthenticated } = useAuth();
   const { activeProject } = useProject();
   const [documents, setDocuments] = useState<DocumentItem[]>([]);
   const [activeDocument, setActiveDocumentState] = useState<DocumentItem | null>(null);
@@ -148,44 +146,42 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     setIsLoadingDocuments(true);
 
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        const serverDocs = await api.documents.list(projectId);
+    try {
+      const serverDocs = await api.documents.list(projectId);
+      if (isStale()) return;
+      if (serverDocs && serverDocs.length > 0) {
+        const fullDoc = await api.documents.get(serverDocs[0].id);
         if (isStale()) return;
-        if (serverDocs && serverDocs.length > 0) {
-          const fullDoc = await api.documents.get(serverDocs[0].id);
-          if (isStale()) return;
-          setDocuments(serverDocs);
-          setActiveDocumentState(fullDoc);
-          setSaveStatus('saved');
-          setIsLoadingDocuments(false);
-          return;
-        } else {
-          const created = await api.documents.create({
-            project_id: projectId,
-            title: '',
-            content_json: emptyDocumentContent(),
-            plain_text: '',
-          });
-          if (isStale()) return;
-          setDocuments([created]);
-          setActiveDocumentState(created);
-          setSaveStatus('saved');
-          setIsLoadingDocuments(false);
-          return;
-        }
-      } catch {
-        // Server unreachable -> fallback to local storage
+        setDocuments(serverDocs);
+        setActiveDocumentState(fullDoc);
+        setSaveStatus('saved');
+        setIsLoadingDocuments(false);
+        return;
+      } else {
+        const created = await api.documents.create({
+          project_id: projectId,
+          title: '',
+          content_json: emptyDocumentContent(),
+          plain_text: '',
+        });
+        if (isStale()) return;
+        setDocuments([created]);
+        setActiveDocumentState(created);
+        setSaveStatus('saved');
+        setIsLoadingDocuments(false);
+        return;
       }
+    } catch {
+      // Server unreachable -> fallback to local storage
     }
 
     if (isStale()) return;
     const localList = loadLocalDocuments(projectId);
     setDocuments(localList);
     setActiveDocumentState(localList[0] || null);
-    setSaveStatus(isOfflineMode ? 'offline' : 'saved');
+    setSaveStatus('saved');
     setIsLoadingDocuments(false);
-  }, [activeProject, isAuthenticated, isOfflineMode, loadLocalDocuments]);
+  }, [activeProject, loadLocalDocuments]);
 
   useEffect(() => {
     refreshDocuments();
@@ -193,7 +189,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const loadCitations = useCallback(async (docId: string) => {
     if (!docId) return;
-    if (isAuthenticated && !isOfflineMode && !docId.startsWith('local-')) {
+    if (!docId.startsWith('local-')) {
       try {
         const cits = await api.citations.list(docId);
         const mapped: CitationItem[] = cits.map((c) => ({
@@ -236,7 +232,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       traverse(activeDocRef.current.content_json);
       setDocumentCitations(extracted);
     }
-  }, [isAuthenticated, isOfflineMode]);
+  }, []);
 
   useEffect(() => {
     if (activeDocument?.id) {
@@ -245,7 +241,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [activeDocument?.id, loadCitations]);
 
   const setActiveDocument = async (doc: DocumentItem) => {
-    if (isAuthenticated && !isOfflineMode && doc.id && !doc.id.startsWith('local-')) {
+    if (doc.id && !doc.id.startsWith('local-')) {
       try {
         const fullDoc = await api.documents.get(doc.id);
         setActiveDocumentState(fullDoc);
@@ -262,22 +258,20 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const createDocument = async (title: string = ''): Promise<DocumentItem> => {
     const projectId = activeProject.id;
 
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        const created = await api.documents.create({
-          project_id: projectId,
-          title,
-          content_json: emptyDocumentContent(),
-          plain_text: '',
-        });
-        setDocuments((prev) => [created, ...prev]);
-        setActiveDocumentState(created);
-        setSaveStatus('saved');
-        setDocumentCitations([]);
-        return created;
-      } catch (err) {
-        console.warn('Could not create document on server, creating locally', err);
-      }
+    try {
+      const created = await api.documents.create({
+        project_id: projectId,
+        title,
+        content_json: emptyDocumentContent(),
+        plain_text: '',
+      });
+      setDocuments((prev) => [created, ...prev]);
+      setActiveDocumentState(created);
+      setSaveStatus('saved');
+      setDocumentCitations([]);
+      return created;
+    } catch (err) {
+      console.warn('Could not create document on server, creating locally', err);
     }
 
     const localDoc: DocumentItem = {
@@ -307,7 +301,6 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const syncLocalDocument = useCallback(
     async (id: string): Promise<DocumentItem | null> => {
       if (!activeProject || !id.startsWith('local-')) return null;
-      if (!isAuthenticated || isOfflineMode) return null;
 
       const localDoc =
         activeDocRef.current?.id === id
@@ -335,7 +328,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         return null;
       }
     },
-    [activeProject, documents, isAuthenticated, isOfflineMode, saveLocalDocuments]
+    [activeProject, documents, saveLocalDocuments]
   );
 
   const updateActiveDocument = async (updates: {
@@ -362,7 +355,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const localList = documents.map((d) => (d.id === current.id ? updatedDoc : d));
     saveLocalDocuments(activeProject.id, localList);
 
-    if (isAuthenticated && !isOfflineMode && !current.id.startsWith('local-')) {
+    if (!current.id.startsWith('local-')) {
       try {
         await api.documents.update(current.id, updates);
         setSaveStatus('saved');
@@ -374,14 +367,14 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       }
     }
 
-    setSaveStatus(isOfflineMode ? 'offline' : 'saved');
+    setSaveStatus('saved');
   };
 
   const deleteDocument = async (id: string) => {
     if (!activeProject) return;
     const projectId = activeProject.id;
 
-    if (isAuthenticated && !isOfflineMode && !id.startsWith('local-')) {
+    if (!id.startsWith('local-')) {
       try {
         await api.documents.delete(id);
       } catch (err) {
@@ -428,7 +421,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
       setDocumentCitations((prev) => [...prev, newItem]);
 
-      if (isAuthenticated && !isOfflineMode && !doc.id.startsWith('local-')) {
+      if (!doc.id.startsWith('local-')) {
         try {
           await api.citations.create(doc.id, {
             paper_id: paperId,
@@ -446,7 +439,7 @@ export const DocumentProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         setTimeout(() => setToastMessage(null), 3000);
       }
     },
-    [citationStyle, documentCitations.length, isAuthenticated, isOfflineMode]
+    [citationStyle, documentCitations.length]
   );
 
   // Phase 5: Handle citation deleted with "Reference removed" toast (UI/UX §4.1)

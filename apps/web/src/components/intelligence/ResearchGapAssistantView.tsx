@@ -462,7 +462,6 @@ export const ResearchGapAssistantView: React.FC<ResearchGapAssistantViewProps> =
                               </div>
                             </div>
                           )}
-                        </div>
                       </div>
                     </div>
                   );

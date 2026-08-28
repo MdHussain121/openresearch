@@ -4,6 +4,7 @@ import anyio
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.v1.dependencies.auth import require_document_access, require_project_access
 from app.core.authors import parse_bibtex_author_field
 from app.core.database import get_db
 from app.core.text_utils import normalize_author_record
@@ -43,15 +44,9 @@ def list_document_citations(
     limit: int = Query(100, ge=1, le=500, description="Pagination limit"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> list[CitationDetailResponse]:
     """List all citations in a document with paper details."""
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     citations = (
         db.query(Citation)
         .options(joinedload(Citation.paper))
@@ -95,12 +90,9 @@ def create_citation(
     citation_in: CitationCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> CitationDetailResponse:
     """Insert a new citation into a document."""
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
     if not verify_user_access_to_owner(
         db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
     ):
@@ -149,8 +141,14 @@ def delete_citation(
     citation_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> None:
     """Delete a single citation."""
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
+
     citation = (
         db.query(Citation)
         .filter(Citation.id == citation_id, Citation.document_id == document_id)
@@ -158,12 +156,6 @@ def delete_citation(
     )
     if not citation:
         raise HTTPException(status_code=404, detail="Citation not found")
-
-    document = citation.document
-    if not verify_user_access_to_owner(
-        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
-    ):
-        raise HTTPException(status_code=403, detail="Permission denied")
 
     db.delete(citation)
     db.commit()
@@ -193,20 +185,14 @@ async def add_paper_by_identifier(
     payload: AddByIdentifierRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> Paper:
     """Resolve metadata and directly create Paper record in project library."""
+    if not verify_user_access_to_owner(
+        db, current_user.id, _project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(status_code=403, detail="Permission denied")
 
-    def _verify_and_resolve_target():
-        project = db.query(Project).filter(Project.id == project_id).first()
-        if not project:
-            raise HTTPException(status_code=404, detail="Project not found")
-        if not verify_user_access_to_owner(
-            db, current_user.id, project.owner_id, required_roles=["owner", "editor"]
-        ):
-            raise HTTPException(status_code=403, detail="Permission denied")
-        return project
-
-    await anyio.to_thread.run_sync(_verify_and_resolve_target)
     meta = await identifier_resolver.resolve(payload.identifier, payload.id_type or "auto")
 
     if meta.get("extraction_status") == "unresolved" or not meta.get("title"):
@@ -260,14 +246,11 @@ def import_bibtex(
     payload: BibtexImportRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> BibtexImportResponse:
     """Parse BibTeX string (.bib content) and add entries as papers to project library."""
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
     if not verify_user_access_to_owner(
-        db, current_user.id, project.owner_id, required_roles=["owner", "editor"]
+        db, current_user.id, _project.owner_id, required_roles=["owner", "editor"]
     ):
         raise HTTPException(status_code=403, detail="Permission denied")
 
@@ -352,15 +335,9 @@ def export_project_bibtex(
     project_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> BibtexExportResponse:
     """Export all papers in a project library to a .bib format."""
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     papers = db.query(Paper).filter(Paper.project_id == project_id).all()
     bib_entries = [serialize_paper_bibtex(p) for p in papers]
     full_bibtex = "\n\n".join(bib_entries)
@@ -376,15 +353,9 @@ def export_document_bibtex(
     document_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> BibtexExportResponse:
     """Export all cited papers in a specific document as a .bib file."""
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     citations = db.query(Citation).filter(Citation.document_id == document_id).all()
     paper_ids = {c.paper_id for c in citations}
     papers = db.query(Paper).filter(Paper.id.in_(paper_ids)).all() if paper_ids else []
@@ -409,19 +380,13 @@ def rank_citations_for_context(
     payload: ContextRankingRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> ContextRankingResponse:
     """
     Ranks library papers for the @-triggered citation popover based on:
     1. Query text match (if query is typed).
     2. Paragraph text semantic context match (keywords / concepts).
     """
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(status_code=403, detail="Permission denied")
-
     papers = db.query(Paper).filter(Paper.project_id == document.project_id).all()
     results: list[ContextRankedPaper] = []
 

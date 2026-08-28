@@ -46,7 +46,7 @@ def hermetic_test_environment(monkeypatch):
     refresh_rate_limiter.reset()
     # Enable local single-user mode for tests so endpoints that previously
     # relied on the anonymous-admin fallback continue to work.
-    monkeypatch.setenv("OPENRESEARCH_DEV_INSECURE_AUTH", "1")
+    monkeypatch.setattr(settings, "OPENRESEARCH_DEV_INSECURE_AUTH", True)
 
 
 @pytest.fixture(autouse=True)

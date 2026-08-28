@@ -3,6 +3,7 @@ from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_document_access, require_project_access
 from app.core.database import get_db
 from app.models.document import Document
 from app.models.project import Project
@@ -27,7 +28,6 @@ def create_document(
     project = db.query(Project).filter(Project.id == doc_in.project_id).first()
     if not project:
         raise HTTPException(status_code=404, detail="Project not found")
-
     if not verify_user_access_to_owner(
         db, current_user.id, project.owner_id, required_roles=["owner", "editor"]
     ):
@@ -56,17 +56,8 @@ def list_project_documents(
     limit: int = Query(100, ge=1, le=500, description="Limit for pagination"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> list[Document]:
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=404, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to view documents in this project",
-        )
-
     return (
         db.query(Document)
         .filter(Document.project_id == project_id)
@@ -79,18 +70,11 @@ def list_project_documents(
 
 @router.get("/documents/{document_id}", response_model=DocumentResponse)
 def get_document(
-    document_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> Document:
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, document.project.owner_id):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to view this document",
-        )
-
     return document
 
 
@@ -100,19 +84,8 @@ def update_document(
     doc_in: DocumentUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> Document:
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(
-        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to update this document",
-        )
-
     # Optimistic locking validation (§3.3)
     if doc_in.version is not None and doc_in.version != document.version:
         raise HTTPException(
@@ -139,20 +112,11 @@ def update_document(
 
 @router.delete("/documents/{document_id}", status_code=status.HTTP_204_NO_CONTENT)
 def delete_document(
-    document_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> None:
-    document = db.query(Document).filter(Document.id == document_id).first()
-    if not document:
-        raise HTTPException(status_code=404, detail="Document not found")
-
-    if not verify_user_access_to_owner(
-        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
-    ):
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="You do not have permission to delete this document",
-        )
-
     db.delete(document)
     db.commit()
     return

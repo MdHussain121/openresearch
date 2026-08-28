@@ -2,6 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_project_access
 from app.core.database import get_db
 from app.models.project import Project
 from app.models.user import User
@@ -34,6 +35,7 @@ def generate_autocomplete(
     data: AutocompleteRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> AutocompleteResponse:
     """
     AI Autocomplete Engine (Roadmap Phase 6.1):
@@ -41,11 +43,7 @@ def generate_autocomplete(
     - 'ghost': Fast inline completion (target <300ms perceived latency)
     - 'continuation': Paragraph-level continuation triggered via Ctrl+/
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
+    if not verify_user_access_to_owner(db, current_user.id, _project.owner_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access AI writing assistance for this project",
@@ -63,15 +61,12 @@ async def stream_autocomplete(
     data: AutocompleteRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> StreamingResponse:
     """
     SSE streaming endpoint for AI Autocomplete / continuation (§3.5).
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
+    if not verify_user_access_to_owner(db, current_user.id, _project.owner_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to access AI writing assistance for this project",
@@ -90,6 +85,7 @@ def generate_ai_edit(
     data: AIEditRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> AIEditResponse:
     """
     AI Editing Actions Engine (Roadmap Phase 6.2):
@@ -98,11 +94,7 @@ def generate_ai_edit(
     Reversible accept/reject flow: original text is never destroyed automatically.
     The 'explain' action requires an LLM provider; it has no rule-based fallback.
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
+    if not verify_user_access_to_owner(db, current_user.id, _project.owner_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to use AI editing for this project",
@@ -120,6 +112,7 @@ def generate_ai_outline(
     data: AIOutlineRequest,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    _project: Project = Depends(require_project_access),
 ) -> AIOutlineResponse:
     """
     Outline Generator (Roadmap Phase 6.3):
@@ -127,11 +120,7 @@ def generate_ai_outline(
     NOTE: This does NOT call an LLM. Output is a deterministic structural template
     with the topic string interpolated. Honest labeling per audit-11 H-2.
     """
-    project = db.query(Project).filter(Project.id == project_id).first()
-    if not project:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Project not found")
-
-    if not verify_user_access_to_owner(db, current_user.id, project.owner_id):
+    if not verify_user_access_to_owner(db, current_user.id, _project.owner_id):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="You do not have permission to generate outlines for this project",

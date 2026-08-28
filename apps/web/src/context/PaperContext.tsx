@@ -2,7 +2,6 @@
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useProject } from './ProjectContext';
-import { useAuth } from './AuthContext';
 import { api } from '../lib/api';
 import type { Author, ExtractionStatus } from '@openresearch/citations';
 
@@ -136,7 +135,6 @@ const PaperContext = createContext<PaperContextType | undefined>(undefined);
 
 export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { activeProject } = useProject();
-  const { isAuthenticated, isOfflineMode, isLoading: isAuthLoading } = useAuth();
   const [papers, setPapers] = useState<Paper[]>([]);
   const [activePaper, setActivePaper] = useState<Paper | null>(null);
   const [annotations, setAnnotations] = useState<PaperAnnotation[]>([]);
@@ -145,13 +143,21 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
   const loadPapers = useCallback(async () => {
-    if (isAuthLoading) return;
     if (!activeProject) {
       setPapers([]);
       return;
     }
 
-    if (isOfflineMode) {
+    try {
+      setIsLoading(true);
+      const list = await api.papers.list(activeProject.id, searchQuery);
+      setPapers(list);
+      // Persist for offline fallback
+      try {
+        localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(list));
+      } catch {}
+    } catch (err) {
+      console.warn('Failed to load papers from server, using local fallback:', err);
       const localKey = `openresearch_local_papers_${activeProject.id}`;
       const saved = localStorage.getItem(localKey);
       if (saved) {
@@ -163,19 +169,10 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         setPapers([]);
       }
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const list = await api.papers.list(activeProject.id, searchQuery);
-      setPapers(list);
-    } catch (err) {
-      console.warn('Failed to load papers:', err);
     } finally {
       setIsLoading(false);
     }
-  }, [activeProject, isAuthLoading, isOfflineMode, searchQuery]);
+  }, [activeProject, searchQuery]);
 
   useEffect(() => {
     loadPapers();
@@ -188,7 +185,14 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       return;
     }
 
-    if (isOfflineMode) {
+    try {
+      setIsLoading(true);
+      const detail = await api.papers.get(paper.id);
+      setActivePaper(detail);
+      const annots = await api.papers.getAnnotations(paper.id);
+      setAnnotations(annots);
+    } catch (err) {
+      console.warn('Failed to get paper details, using local fallback:', err);
       setActivePaper(paper);
       const key = `openresearch_local_annots_${paper.id}`;
       const saved = localStorage.getItem(key);
@@ -201,18 +205,6 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       } else {
         setAnnotations([]);
       }
-      return;
-    }
-
-    try {
-      setIsLoading(true);
-      const detail = await api.papers.get(paper.id);
-      setActivePaper(detail);
-      const annots = await api.papers.getAnnotations(paper.id);
-      setAnnotations(annots);
-    } catch (err) {
-      console.warn('Failed to get paper details:', err);
-      setActivePaper(paper);
     } finally {
       setIsLoading(false);
     }
@@ -228,7 +220,19 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     });
 
     try {
-      if (isOfflineMode) {
+      setUploadProgress((prev) => prev ? { ...prev, step: 'extracting' } : null);
+      const paper = await api.papers.upload(activeProject.id, file);
+      setUploadProgress((prev) => prev ? {
+        ...prev,
+        step: 'ready',
+        isUnverified: paper.extraction_status === 'unverified',
+      } : null);
+      await loadPapers();
+      return paper;
+    } catch (err: unknown) {
+      // Server unreachable — create local fallback so offline works
+      console.warn('Upload failed on server, creating local entry:', err);
+      try {
         const title = file.name.replace(/\.pdf$/i, '').replace(/_/g, ' ');
         const newPaper: Paper = {
           id: `local-paper-${Date.now()}`,
@@ -238,41 +242,21 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
           year: new Date().getFullYear(),
           extraction_status: 'unverified',
           created_at: new Date().toISOString(),
-          metadata_json: {
-            title,
-            year: new Date().getFullYear(),
-            extraction_status: 'unverified',
-          },
+          metadata_json: { title, year: new Date().getFullYear(), extraction_status: 'unverified' },
         };
-
         const updated = [newPaper, ...papers];
         setPapers(updated);
-        localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(updated));
-
+        try { localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(updated)); } catch {}
         setUploadProgress((prev) => prev ? { ...prev, step: 'ready', isUnverified: true } : null);
         return newPaper;
+      } catch {
+        setUploadProgress((prev) => prev ? {
+          ...prev,
+          isUploading: false,
+          error: err instanceof Error ? err.message : 'Upload failed',
+        } : null);
+        return null;
       }
-
-      // Step 2: Extraction
-      setUploadProgress((prev) => prev ? { ...prev, step: 'extracting' } : null);
-
-      const paper = await api.papers.upload(activeProject.id, file);
-
-      setUploadProgress((prev) => prev ? {
-        ...prev,
-        step: 'ready',
-        isUnverified: paper.extraction_status === 'unverified',
-      } : null);
-
-      await loadPapers();
-      return paper;
-    } catch (err: unknown) {
-      setUploadProgress((prev) => prev ? {
-        ...prev,
-        isUploading: false,
-        error: err instanceof Error ? err.message : 'Upload failed',
-      } : null);
-      return null;
     }
   };
 
@@ -282,28 +266,20 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
   const deletePaper = async (paperId: string) => {
     if (!activeProject) return;
-
-    if (isOfflineMode) {
-      const updated = papers.filter((p) => p.id !== paperId);
-      setPapers(updated);
-      localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(updated));
-      if (activePaper?.id === paperId) {
-        setActivePaper(null);
-        setAnnotations([]);
-      }
-      return;
-    }
-
     try {
       await api.papers.delete(paperId);
-      if (activePaper?.id === paperId) {
-        setActivePaper(null);
-        setAnnotations([]);
-      }
-      await loadPapers();
     } catch (err) {
-      console.warn('Failed to delete paper:', err);
+      console.warn('Failed to delete paper on server:', err);
     }
+    // Always update local state
+    const updated = papers.filter((p) => p.id !== paperId);
+    setPapers(updated);
+    try { localStorage.setItem(`openresearch_local_papers_${activeProject.id}`, JSON.stringify(updated)); } catch {}
+    if (activePaper?.id === paperId) {
+      setActivePaper(null);
+      setAnnotations([]);
+    }
+    try { await loadPapers(); } catch {}
   };
 
   const createAnnotation = async (data: {
@@ -314,8 +290,12 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     position_data?: Record<string, unknown>;
   }): Promise<PaperAnnotation | null> => {
     if (!activePaper) return null;
-
-    if (isOfflineMode) {
+    try {
+      const annot = await api.papers.createAnnotation(activePaper.id, data);
+      setAnnotations((prev) => [...prev, annot]);
+      return annot;
+    } catch (err) {
+      console.warn('Failed to create annotation on server, saving locally:', err);
       const newAnnot: PaperAnnotation = {
         id: `local-annot-${Date.now()}`,
         paper_id: activePaper.id,
@@ -330,17 +310,8 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       };
       const updated = [...annotations, newAnnot];
       setAnnotations(updated);
-      localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated));
+      try { localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated)); } catch {}
       return newAnnot;
-    }
-
-    try {
-      const annot = await api.papers.createAnnotation(activePaper.id, data);
-      setAnnotations((prev) => [...prev, annot]);
-      return annot;
-    } catch (err) {
-      console.warn('Failed to create annotation:', err);
-      return null;
     }
   };
 
@@ -353,37 +324,27 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   ) => {
     if (!activePaper) return;
-
-    if (isOfflineMode) {
-      const updated = annotations.map((a) => (a.id === annotationId ? { ...a, ...data, updated_at: new Date().toISOString() } : a));
-      setAnnotations(updated);
-      localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated));
-      return;
-    }
-
     try {
       const res = await api.papers.updateAnnotation(activePaper.id, annotationId, data);
       setAnnotations((prev) => prev.map((a) => (a.id === annotationId ? res : a)));
     } catch (err) {
-      console.warn('Failed to update annotation:', err);
+      console.warn('Failed to update annotation on server, saving locally:', err);
+      const updated = annotations.map((a) => (a.id === annotationId ? { ...a, ...data, updated_at: new Date().toISOString() } : a));
+      setAnnotations(updated);
+      try { localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated)); } catch {}
     }
   };
 
   const deleteAnnotation = async (annotationId: string) => {
     if (!activePaper) return;
-
-    if (isOfflineMode) {
-      const updated = annotations.filter((a) => a.id !== annotationId);
-      setAnnotations(updated);
-      localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated));
-      return;
-    }
-
     try {
       await api.papers.deleteAnnotation(activePaper.id, annotationId);
       setAnnotations((prev) => prev.filter((a) => a.id !== annotationId));
     } catch (err) {
-      console.warn('Failed to delete annotation:', err);
+      console.warn('Failed to delete annotation on server:', err);
+      const updated = annotations.filter((a) => a.id !== annotationId);
+      setAnnotations(updated);
+      try { localStorage.setItem(`openresearch_local_annots_${activePaper.id}`, JSON.stringify(updated)); } catch {}
     }
   };
 
@@ -394,11 +355,6 @@ export const PaperProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     prompt_type?: string;
   }) => {
     if (!activePaper) return null;
-
-    if (isOfflineMode) {
-      return null;
-    }
-
     try {
       return await api.papers.ask(activePaper.id, data);
     } catch (err) {

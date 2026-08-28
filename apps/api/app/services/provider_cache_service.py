@@ -65,8 +65,8 @@ class ProviderCacheService:
                     client = redis.Redis.from_url(
                         settings.REDIS_URL,
                         decode_responses=True,
-                        socket_timeout=1.0,
-                        socket_connect_timeout=1.0,
+                        socket_timeout=settings.PROVIDER_SOCKET_TIMEOUT_SECONDS,
+                        socket_connect_timeout=settings.PROVIDER_SOCKET_CONNECT_TIMEOUT_SECONDS,
                     )
                     client.ping()
                     self._redis_client = client

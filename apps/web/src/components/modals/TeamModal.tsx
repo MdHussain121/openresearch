@@ -32,7 +32,7 @@ interface TeamModalProps {
 }
 
 export const TeamModal: React.FC<TeamModalProps> = ({ isOpen, onClose }) => {
-  const { user, isAuthenticated } = useAuth();
+  const { user } = useAuth();
   const { refreshProjects } = useProject();
 
   const [teams, setTeams] = useState<TeamDTO[]>([]);
@@ -55,7 +55,6 @@ export const TeamModal: React.FC<TeamModalProps> = ({ isOpen, onClose }) => {
   const [pendingRemoveId, setPendingRemoveId] = useState<string | null>(null);
 
   const loadTeams = useCallback(async () => {
-    if (!isAuthenticated) return;
     setIsLoading(true);
     setError(null);
     try {
@@ -69,7 +68,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ isOpen, onClose }) => {
     } finally {
       setIsLoading(false);
     }
-  }, [isAuthenticated, selectedTeam]);
+  }, [selectedTeam]);
 
   const loadMembers = useCallback(async (teamId: string) => {
     try {
@@ -84,7 +83,7 @@ export const TeamModal: React.FC<TeamModalProps> = ({ isOpen, onClose }) => {
     if (isOpen) {
       loadTeams();
     }
-  }, [isOpen, isAuthenticated, loadTeams]);
+  }, [isOpen, loadTeams]);
 
   useEffect(() => {
     if (selectedTeam) {

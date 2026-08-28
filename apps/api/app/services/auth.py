@@ -1,5 +1,4 @@
 import logging
-import os
 from datetime import UTC, datetime, timedelta
 from typing import Any
 
@@ -56,6 +55,25 @@ def create_refresh_token(data: dict[str, Any], expires_delta: timedelta | None =
     return _create_token(
         data, expires_delta or timedelta(minutes=settings.REFRESH_TOKEN_EXPIRE_MINUTES), "refresh"
     )
+
+
+def create_password_reset_token(user_id: str, email: str) -> str:
+    """Create a short-lived password reset token (1 hour expiry)."""
+    return _create_token(
+        {"sub": user_id, "email": email},
+        timedelta(minutes=60),
+        "password_reset",
+    )
+
+
+def decode_password_reset_token(token: str) -> dict[str, Any]:
+    """Decode and validate a password reset token."""
+    payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+    if payload.get("token_type") != "password_reset":
+        raise jwt.InvalidTokenError(
+            f"Expected password_reset token, got {payload.get('token_type')}"
+        )
+    return payload
 
 
 def decode_token(token: str, expected_type: str = "access") -> dict[str, Any]:
@@ -117,13 +135,12 @@ def get_current_user(
     auth: HTTPAuthorizationCredentials | None = Depends(security), db: Session = Depends(get_db)
 ) -> User:
     """
-    Resolves the acting user from a valid bearer token.
-    If no valid token is provided, returns the auto-provisioned local user ONLY
-    when OPENRESEARCH_DEV_INSECURE_AUTH=1 is set (local single-user dev mode).
-    Otherwise raises 401.
+    Local-first mode: always returns the auto-provisioned local user.
+    Authentication has been removed — the app runs offline as a single-user
+    local application. Bearer tokens are accepted for backwards compatibility
+    but never required.
     """
-    dev_insecure = os.environ.get("OPENRESEARCH_DEV_INSECURE_AUTH", "").strip() == "1"
-
+    # Try to honor a valid token if provided (backwards compat), but never require it.
     if auth and auth.credentials:
         try:
             payload = decode_token(auth.credentials, expected_type="access")
@@ -134,35 +151,16 @@ def get_current_user(
                 user = db.query(User).filter(User.id == token_data.user_id).first()
                 if user is not None:
                     return user
-        except (jwt.InvalidTokenError, ValidationError) as exc:
-            logger.warning(
-                "Invalid bearer token (%s); %s",
-                type(exc).__name__,
-                "falling back to local user (dev mode)" if dev_insecure else "rejecting",
-            )
-            if not dev_insecure:
-                raise HTTPException(
-                    status_code=status.HTTP_401_UNAUTHORIZED,
-                    detail="Invalid or expired authentication token",
-                    headers={"WWW-Authenticate": "Bearer"},
-                ) from exc
+        except (jwt.InvalidTokenError, ValidationError):
+            # Invalid token — fall through to local user
+            pass
 
-    if dev_insecure:
-        return get_or_create_local_user(db)
-
-    raise HTTPException(
-        status_code=status.HTTP_401_UNAUTHORIZED,
-        detail="Not authenticated",
-        headers={"WWW-Authenticate": "Bearer"},
-    )
+    return get_or_create_local_user(db)
 
 
 def get_current_admin_user(current_user: User = Depends(get_current_user)) -> User:
-    if not current_user.is_admin:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Admin privileges required for this operation",
-        )
+    # Local-first: local user is always admin (created as admin in get_or_create_local_user).
+    # Keep check for completeness but it will always pass.
     return current_user
 
 

@@ -41,6 +41,7 @@ interface TopBarProps {
   onOpenNewProject: () => void;
   onOpenTeams: () => void;
   onOpenAccount?: () => void;
+  localUserLabel?: string;
 }
 
 export const TopBar: React.FC<TopBarProps> = ({
@@ -55,6 +56,7 @@ export const TopBar: React.FC<TopBarProps> = ({
   onOpenNewProject,
   onOpenTeams,
   onOpenAccount = () => {},
+  localUserLabel = 'Local Researcher',
 }) => {
   return (
     <header className="h-topbar border-b border-border-default bg-surface px-4 flex items-center justify-between shrink-0 select-none z-30">
@@ -206,20 +208,11 @@ export const TopBar: React.FC<TopBarProps> = ({
           <TooltipContent>{isDark ? 'Switch to Light Theme' : 'Switch to Dark Theme'}</TooltipContent>
         </Tooltip>
 
-        {/* Account Button */}
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <button
-              type="button"
-              onClick={onOpenAccount}
-              className="p-2 min-h-[36px] min-w-[36px] flex items-center justify-center rounded border border-border-default hover:bg-sunken text-text-secondary transition-[transform,background-color,color] duration-150 active:scale-90 [@media(hover:hover)]:hover:-translate-y-px hidden sm:flex focus-visible:ring-2 focus-visible:ring-accent"
-              aria-label="Account"
-            >
-              <User className="w-4 h-4" />
-            </button>
-          </TooltipTrigger>
-          <TooltipContent>Account</TooltipContent>
-        </Tooltip>
+        {/* Local user indicator (offline-first, no logout) */}
+        <div className="hidden sm:flex items-center gap-2 px-2.5 py-1 min-h-[36px] rounded border border-border-default bg-sunken text-text-secondary text-xs" title={localUserLabel}>
+          <User className="w-4 h-4" />
+          <span className="max-w-[140px] truncate hidden lg:inline">{localUserLabel}</span>
+        </div>
       </div>
     </header>
   );

@@ -36,7 +36,7 @@ const DEFAULT_LOCAL_PROJECT: Project = {
 const ProjectContext = createContext<ProjectContextType | undefined>(undefined);
 
 export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const { user, isOfflineMode, isAuthenticated, isLoading: isAuthLoading } = useAuth();
+  const { user } = useAuth();
   const [projects, setProjects] = useState<Project[]>([]);
   const [activeProject, setActiveProjectState] = useState<Project>(DEFAULT_LOCAL_PROJECT);
   const [isLoadingProjects, setIsLoadingProjects] = useState(true);
@@ -64,37 +64,30 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refreshProjects = useCallback(async () => {
     setIsLoadingProjects(true);
-    if (isAuthLoading) {
-      setIsLoadingProjects(false);
-      return;
-    }
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        const serverProjects = await api.projects.list();
-        if (serverProjects && serverProjects.length > 0) {
-          setProjects(serverProjects);
-          setActiveProjectState((prev) => {
-            if (prev && serverProjects.find((p) => p.id === prev.id)) {
-              return serverProjects.find((p) => p.id === prev.id) || serverProjects[0];
-            }
-            return serverProjects[0];
-          });
-          setIsLoadingProjects(false);
-          return;
-        } else {
-          // If user has no projects on server yet, create one
-          const newProj = await api.projects.create({
-            name: 'Academic Research Project',
-            description: 'Literature review and draft paper',
-          });
-          setProjects([newProj]);
-          setActiveProjectState(newProj);
-          setIsLoadingProjects(false);
-          return;
-        }
-      } catch {
-        // Server unreachable -> fallback to local storage
+    try {
+      const serverProjects = await api.projects.list();
+      if (serverProjects && serverProjects.length > 0) {
+        setProjects(serverProjects);
+        setActiveProjectState((prev) => {
+          if (prev && serverProjects.find((p) => p.id === prev.id)) {
+            return serverProjects.find((p) => p.id === prev.id) || serverProjects[0];
+          }
+          return serverProjects[0];
+        });
+        setIsLoadingProjects(false);
+        return;
+      } else {
+        const newProj = await api.projects.create({
+          name: 'Academic Research Project',
+          description: 'Literature review and draft paper',
+        });
+        setProjects([newProj]);
+        setActiveProjectState(newProj);
+        setIsLoadingProjects(false);
+        return;
       }
+    } catch {
+      // Server unreachable -> fallback to local storage
     }
 
     const localList = loadLocalProjects();
@@ -104,13 +97,11 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
       return localList[0] ?? DEFAULT_LOCAL_PROJECT;
     });
     setIsLoadingProjects(false);
-  }, [isAuthenticated, isAuthLoading, isOfflineMode, loadLocalProjects]);
+  }, [loadLocalProjects]);
 
   useEffect(() => {
-    if (!isAuthLoading) {
-      refreshProjects();
-    }
-  }, [refreshProjects, isAuthLoading, user]);
+    refreshProjects();
+  }, [refreshProjects]);
 
   const setActiveProject = (project: Project) => {
     setActiveProjectState(project);
@@ -120,15 +111,13 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const createProject = async (name: string, description?: string): Promise<Project> => {
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        const created = await api.projects.create({ name, description });
-        setProjects((prev) => [created, ...prev]);
-        setActiveProject(created);
-        return created;
-      } catch (err) {
-        console.warn('Could not create project on server, falling back locally', err);
-      }
+    try {
+      const created = await api.projects.create({ name, description });
+      setProjects((prev) => [created, ...prev]);
+      setActiveProject(created);
+      return created;
+    } catch (err) {
+      console.warn('Could not create project on server, falling back locally', err);
     }
 
     const newLocal: Project = {
@@ -147,17 +136,15 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const updateProject = async (id: string, name?: string, description?: string) => {
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        const updated = await api.projects.update(id, { name, description });
-        setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
-        if (activeProject?.id === id) {
-          setActiveProject(updated);
-        }
-        return;
-      } catch (err) {
-        console.warn('Could not update project on server', err);
+    try {
+      const updated = await api.projects.update(id, { name, description });
+      setProjects((prev) => prev.map((p) => (p.id === id ? updated : p)));
+      if (activeProject?.id === id) {
+        setActiveProject(updated);
       }
+      return;
+    } catch (err) {
+      console.warn('Could not update project on server, will save locally', err);
     }
 
     const updated = projects.map((p) =>
@@ -179,12 +166,10 @@ export const ProjectProvider: React.FC<{ children: React.ReactNode }> = ({ child
   };
 
   const deleteProject = async (id: string) => {
-    if (isAuthenticated && !isOfflineMode) {
-      try {
-        await api.projects.delete(id);
-      } catch (err) {
-        console.warn('Could not delete project on server', err);
-      }
+    try {
+      await api.projects.delete(id);
+    } catch (err) {
+      console.warn('Could not delete project on server', err);
     }
 
     const remaining = projects.filter((p) => p.id !== id);

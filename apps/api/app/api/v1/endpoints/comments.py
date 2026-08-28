@@ -1,10 +1,10 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session, joinedload
 
+from app.api.v1.dependencies.auth import require_document_access
 from app.core.database import get_db
 from app.models.comment import DocumentComment
 from app.models.document import Document
-from app.models.project import Project
 from app.models.user import User
 from app.schemas.models import (
     CommentCreate,
@@ -15,20 +15,6 @@ from app.schemas.models import (
 from app.services.auth import get_current_user, verify_user_access_to_owner
 
 router = APIRouter()
-
-
-def _check_doc_access(
-    db: Session, user: User, document_id: str, required_roles: list[str] | None = None
-) -> Document:
-    doc = db.query(Document).filter(Document.id == document_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    project = db.query(Project).filter(Project.id == doc.project_id).first()
-    if not project or not verify_user_access_to_owner(
-        db, user.id, project.owner_id, required_roles=required_roles
-    ):
-        raise HTTPException(status_code=403, detail="You do not have access to this document")
-    return doc
 
 
 def _build_comment_response(c: DocumentComment) -> CommentResponse:
@@ -58,12 +44,11 @@ def list_comments(
     limit: int = Query(100, ge=1, le=500, description="Pagination limit"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> list[CommentResponse]:
     """
     Lists top-level inline comments with nested replies for a document.
     """
-    _check_doc_access(db, current_user, document_id)
-
     query = (
         db.query(DocumentComment)
         .options(joinedload(DocumentComment.replies))
@@ -86,11 +71,18 @@ def create_comment(
     comment_in: CommentCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> CommentResponse:
     """
     Creates an inline comment thread anchored to a selection or document.
     """
-    _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to add comments to this document",
+        )
 
     if comment_in.parent_id:
         parent = (
@@ -134,11 +126,18 @@ def create_comment_reply(
     reply_in: CommentReplyCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> CommentResponse:
     """
     Appends a threaded reply to an existing comment.
     """
-    _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to reply to comments on this document",
+        )
 
     parent = (
         db.query(DocumentComment)
@@ -169,11 +168,18 @@ def update_comment(
     comment_in: CommentUpdate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> CommentResponse:
     """
     Updates comment content or toggles resolution status.
     """
-    _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to update comments on this document",
+        )
 
     comment = (
         db.query(DocumentComment)
@@ -206,11 +212,18 @@ def delete_comment(
     comment_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> None:
     """
     Deletes a comment and its threaded replies.
     """
-    doc = _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to delete comments on this document",
+        )
 
     comment = (
         db.query(DocumentComment)
@@ -221,9 +234,8 @@ def delete_comment(
         raise HTTPException(status_code=404, detail="Comment not found")
 
     # Author can delete, or project owner can delete
-    project = doc.project
     is_owner = verify_user_access_to_owner(
-        db, current_user.id, project.owner_id, required_roles=["owner"]
+        db, current_user.id, document.project.owner_id, required_roles=["owner"]
     )
 
     if comment.user_id != current_user.id and not is_owner:

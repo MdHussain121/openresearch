@@ -4,9 +4,9 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
+from app.api.v1.dependencies.auth import require_document_access
 from app.core.database import get_db
 from app.models.document import Document
-from app.models.project import Project
 from app.models.user import User
 from app.models.version import DocumentVersion
 from app.schemas.models import (
@@ -48,29 +48,16 @@ def _commit_version(db: Session, checkpoint: DocumentVersion) -> None:
             checkpoint.version_number = _allocate_version_number(db, checkpoint.document_id)
 
 
-def _check_doc_access(
-    db: Session, user: User, document_id: str, required_roles: list[str] | None = None
-) -> Document:
-    doc = db.query(Document).filter(Document.id == document_id).first()
-    if not doc:
-        raise HTTPException(status_code=404, detail="Document not found")
-    project = db.query(Project).filter(Project.id == doc.project_id).first()
-    if not project or not verify_user_access_to_owner(
-        db, user.id, project.owner_id, required_roles=required_roles
-    ):
-        raise HTTPException(status_code=403, detail="You do not have access to this document")
-    return doc
-
-
 @router.get("/documents/{document_id}/versions", response_model=list[VersionResponse])
 def list_document_versions(
-    document_id: str, current_user: User = Depends(get_current_user), db: Session = Depends(get_db)
+    document_id: str,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> list[DocumentVersion]:
     """
     Lists the revision history timeline for a document.
     """
-    _check_doc_access(db, current_user, document_id)
-
     return (
         db.query(DocumentVersion)
         .filter(DocumentVersion.document_id == document_id)
@@ -89,19 +76,26 @@ def create_document_version(
     version_in: VersionCreate,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> DocumentVersion:
     """
     Creates a named snapshot / milestone version of the current document state.
     """
-    doc = _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to create versions for this document",
+        )
 
     next_version = _allocate_version_number(db, document_id)
 
     content_json = (
-        version_in.content_json if version_in.content_json is not None else doc.content_json
+        version_in.content_json if version_in.content_json is not None else document.content_json
     )
-    plain_text = version_in.plain_text if version_in.plain_text is not None else doc.plain_text
-    title = version_in.title or doc.title
+    plain_text = version_in.plain_text if version_in.plain_text is not None else document.plain_text
+    title = version_in.title or document.title
 
     version_obj = DocumentVersion(
         document_id=document_id,
@@ -125,9 +119,8 @@ def get_document_version(
     version_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> DocumentVersion:
-    _check_doc_access(db, current_user, document_id)
-
     version = (
         db.query(DocumentVersion)
         .filter(DocumentVersion.id == version_id, DocumentVersion.document_id == document_id)
@@ -148,11 +141,18 @@ def restore_document_version(
     version_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> DocumentVersion:
     """
     Restores the live document content to a prior snapshot while saving a new version checkpoint.
     """
-    doc = _check_doc_access(db, current_user, document_id, required_roles=["owner", "editor"])
+    if not verify_user_access_to_owner(
+        db, current_user.id, document.project.owner_id, required_roles=["owner", "editor"]
+    ):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="You do not have permission to restore versions for this document",
+        )
 
     target_version = (
         db.query(DocumentVersion)
@@ -165,10 +165,10 @@ def restore_document_version(
     # Update current document state and create checkpoint atomically
     for attempt in range(_MAX_VERSION_NUMBER_RETRIES):
         try:
-            doc.title = target_version.title
-            doc.content_json = target_version.content_json
-            doc.plain_text = target_version.plain_text
-            doc.version = doc.version + 1
+            document.title = target_version.title
+            document.content_json = target_version.content_json
+            document.plain_text = target_version.plain_text
+            document.version = document.version + 1
 
             next_ver = _allocate_version_number(db, document_id)
             restore_checkpoint = DocumentVersion(
@@ -176,9 +176,9 @@ def restore_document_version(
                 version_number=next_ver,
                 user_id=current_user.id,
                 author_name=current_user.name or current_user.email,
-                title=doc.title,
-                content_json=doc.content_json,
-                plain_text=doc.plain_text,
+                title=document.title,
+                content_json=document.content_json,
+                plain_text=document.plain_text,
                 change_summary=f"Restored from Version {target_version.version_number}",
             )
             db.add(restore_checkpoint)
@@ -189,7 +189,7 @@ def restore_document_version(
             if attempt == _MAX_VERSION_NUMBER_RETRIES - 1:
                 raise
 
-    db.refresh(doc)
+    db.refresh(document)
     db.refresh(restore_checkpoint)
     return restore_checkpoint
 
@@ -203,12 +203,11 @@ def compute_version_diff(
     v2_id: str,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
+    document: Document = Depends(require_document_access),
 ) -> VersionDiffResponse:
     """
     Computes a granular, line-by-line diff between two document revisions.
     """
-    _check_doc_access(db, current_user, document_id)
-
     v1 = (
         db.query(DocumentVersion)
         .filter(DocumentVersion.id == v1_id, DocumentVersion.document_id == document_id)

@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
+from app.core.config import settings
 from app.core.http_client import get_sync_http_client
 from app.models.paper import Paper
 from app.schemas.models import (
@@ -220,7 +221,7 @@ class ZoteroService:
                     base,
                     headers=headers,
                     params={"format": "json", "limit": self.ZOTERO_PAGE_SIZE, "start": start},
-                    timeout=10.0,
+                    timeout=settings.ZOTERO_TIMEOUT_SECONDS,
                 )
                 if res.status_code != 200:
                     logger.warning(
