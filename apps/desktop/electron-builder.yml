@@ -6,8 +6,10 @@ directories:
   buildResources: build
 files:
   - dist/**/*
+  - assets/**/*
   - package.json
 win:
+  icon: assets/icon.ico
   target:
     - target: nsis
       arch:
@@ -16,6 +18,7 @@ win:
       arch:
         - x64
 mac:
+  icon: assets/icon.png
   target:
     - default
   category: public.app-category.education

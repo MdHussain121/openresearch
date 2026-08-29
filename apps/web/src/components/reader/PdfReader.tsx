@@ -79,8 +79,14 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
     () => (Array.isArray(metadata.sections) ? metadata.sections : []),
     [metadata]
   );
-  const tables = Array.isArray(metadata.tables) ? metadata.tables : [];
-  const equations = Array.isArray(metadata.equations) ? metadata.equations : [];
+  const tables = useMemo(
+    () => (Array.isArray(metadata.tables) ? metadata.tables : []),
+    [metadata]
+  );
+  const equations = useMemo(
+    () => (Array.isArray(metadata.equations) ? metadata.equations : []),
+    [metadata]
+  );
   const pages = useMemo(
     () => (Array.isArray(metadata.pages) ? metadata.pages : []),
     [metadata]
@@ -88,21 +94,19 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
   const totalPages = Math.max(pages.length, metadata.page_count || 1, 1);
   const isUnverified = paper.extraction_status === 'unverified';
 
-  // Check if paper has a locally stored and served PDF file
+  // Check if paper has a locally uploaded/stored PDF accessible via the backend API
   const hasLocalPdf = useMemo(() => {
     return Boolean(metadata.pdf_path);
   }, [metadata]);
 
-  // External source / web URL (e.g. arXiv abstract page or DOI landing page)
+  // Resolve external source URL (e.g. arXiv abstract page or DOI landing page)
   const externalSourceUrl = useMemo(() => {
     return (
-      (metadata.pdf_url as string) ||
       (metadata.url as string) ||
-      (paper.arxiv_id ? `https://arxiv.org/abs/${paper.arxiv_id}` : '') ||
-      (paper.doi ? `https://doi.org/${paper.doi}` : '') ||
-      null
+      (metadata.pdf_url as string) ||
+      (paper.doi ? `https://doi.org/${paper.doi}` : null)
     );
-  }, [metadata, paper]);
+  }, [metadata, paper.doi]);
 
   // Determine the type of "no text" situation for better fallback messaging
   const noTextReason = useMemo(() => {
@@ -419,16 +423,16 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
             <AlertTriangle className="w-4 h-4 shrink-0" />
             <span>{t('reader.unverifiedBanner')}</span>
           </div>
-          {(hasLocalPdf || externalSourceUrl) && (
+          {externalSourceUrl && (
             <a
-              href={hasLocalPdf ? `/api/v1/papers/${paper.id}/pdf` : externalSourceUrl!}
+              href={hasLocalPdf ? `/api/v1/papers/${paper.id}/pdf` : externalSourceUrl}
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-1 px-2 py-1 text-xs bg-trust-warning/20 border border-trust-warning/40 rounded hover:bg-trust-warning/30 transition-colors"
-              title="View original source"
+              title={hasLocalPdf ? 'View original PDF' : 'Open external paper source'}
             >
               <ExternalLink className="w-3 h-3" />
-              <span>{hasLocalPdf ? "View PDF Original" : "Open Source Web Page"}</span>
+              <span>{hasLocalPdf ? 'View PDF Original' : 'Open Source'}</span>
             </a>
           )}
         </div>
@@ -466,22 +470,19 @@ export const PdfReader: React.FC<PdfReaderProps> = ({ paper, onBack, onOpenChat 
                   <p className="text-xs text-text-secondary">
                     {paper.authors?.map((a) => a.literal || `${a.givenName || ''} ${a.familyName}`.trim()).join(', ')}
                   </p>
-                  <div className="flex items-center justify-center gap-3 pt-1 flex-wrap">
+                  <div className="flex items-center justify-center space-x-3 text-[11px] text-text-tertiary">
                     {paper.doi && (
-                      <p className="text-[11px] text-text-tertiary font-mono">DOI: {paper.doi}</p>
-                    )}
-                    {paper.arxiv_id && (
-                      <p className="text-[11px] text-text-tertiary font-mono">arXiv: {paper.arxiv_id}</p>
+                      <span className="font-mono">DOI: {paper.doi}</span>
                     )}
                     {externalSourceUrl && (
                       <a
                         href={externalSourceUrl}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-flex items-center space-x-1 text-[11px] text-accent hover:underline font-medium"
+                        className="inline-flex items-center space-x-1 text-accent hover:underline font-sans"
                       >
+                        <span>Open Original Source</span>
                         <ExternalLink className="w-3 h-3" />
-                        <span>Open Source in Browser</span>
                       </a>
                     )}
                   </div>

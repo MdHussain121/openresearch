@@ -1,33 +1,40 @@
 import { app, BrowserWindow, ipcMain, shell } from 'electron';
 import * as path from 'path';
-import * as fs from 'fs';
 import * as http from 'http';
+import * as fs from 'fs';
 import { spawn, ChildProcess } from 'child_process';
+
+// Set App User Model ID on Windows for proper taskbar grouping & icon display
+if (process.platform === 'win32') {
+  app.setAppUserModelId('org.openresearch.desktop');
+}
 
 let mainWindow: BrowserWindow | null = null;
 let backendProcess: ChildProcess | null = null;
+
+function getAppIcon(): string | undefined {
+  const icoCandidate = path.join(__dirname, '../assets/icon.ico');
+  const pngCandidate = path.join(__dirname, '../assets/icon.png');
+  const packagedIco = path.join(process.resourcesPath || '', 'assets/icon.ico');
+  const packagedPng = path.join(process.resourcesPath || '', 'assets/icon.png');
+
+  if (process.platform === 'win32') {
+    if (fs.existsSync(icoCandidate)) return icoCandidate;
+    if (fs.existsSync(packagedIco)) return packagedIco;
+    if (fs.existsSync(pngCandidate)) return pngCandidate;
+    if (fs.existsSync(packagedPng)) return packagedPng;
+  } else {
+    if (fs.existsSync(pngCandidate)) return pngCandidate;
+    if (fs.existsSync(packagedPng)) return packagedPng;
+    if (fs.existsSync(icoCandidate)) return icoCandidate;
+  }
+  return undefined;
+}
 
 const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
 const FRONTEND_PORT = process.env.FRONTEND_PORT || '3000';
 const BACKEND_PORT = process.env.BACKEND_PORT || '8000';
 const WEB_URL = process.env.APP_URL || `http://localhost:${FRONTEND_PORT}`;
-
-function getAppIconPath(): string {
-  const icoPath = path.join(__dirname, '../assets/icon.ico');
-  const pngPath = path.join(__dirname, '../assets/icon.png');
-  const fallbackIco = path.join(process.cwd(), 'apps/desktop/assets/icon.ico');
-  const fallbackPng = path.join(process.cwd(), 'apps/desktop/assets/icon.png');
-  const webIcon = path.join(process.cwd(), 'apps/web/public/icon.png');
-
-  if (process.platform === 'win32') {
-    if (fs.existsSync(icoPath)) return icoPath;
-    if (fs.existsSync(fallbackIco)) return fallbackIco;
-  }
-  if (fs.existsSync(pngPath)) return pngPath;
-  if (fs.existsSync(fallbackPng)) return fallbackPng;
-  if (fs.existsSync(webIcon)) return webIcon;
-  return pngPath;
-}
 
 function checkServerReady(url: string, timeoutMs: number = 30000): Promise<boolean> {
   const startTime = Date.now();
@@ -112,7 +119,7 @@ function stopBackend() {
 async function createWindow() {
   startBackendIfNeeded();
 
-  const iconPath = getAppIconPath();
+  const iconPath = getAppIcon();
 
   mainWindow = new BrowserWindow({
     width: 1280,
@@ -120,10 +127,10 @@ async function createWindow() {
     minWidth: 980,
     minHeight: 640,
     frame: false,
-    icon: iconPath,
     titleBarStyle: process.platform === 'darwin' ? 'hiddenInset' : 'hidden',
     titleBarOverlay: false,
     backgroundColor: '#17171A',
+    icon: iconPath,
     show: false,
     autoHideMenuBar: true,
     webPreferences: {
@@ -135,13 +142,12 @@ async function createWindow() {
     },
   });
 
-  if (process.platform !== 'darwin' && iconPath) {
-    try {
-      mainWindow.setIcon(iconPath);
-    } catch {}
-  }
-
   mainWindow.once('ready-to-show', () => {
+    if (iconPath && process.platform === 'win32' && mainWindow) {
+      try {
+        mainWindow.setIcon(iconPath);
+      } catch {}
+    }
     mainWindow?.show();
     mainWindow?.focus();
   });
@@ -194,6 +200,13 @@ async function createWindow() {
       }
     } catch {
       // ignore invalid URLs
+    }
+  });
+
+  // Handle failed sub-frame loads gracefully without uncaught exceptions
+  mainWindow.webContents.on('did-fail-load', (_event, _errorCode, _errorDescription, _validatedURL, isMainFrame) => {
+    if (!isMainFrame) {
+      return;
     }
   });
 
@@ -251,9 +264,6 @@ ipcMain.handle('app:get-version', () => {
 
 // App Lifecycle
 app.whenReady().then(() => {
-  if (process.platform === 'win32') {
-    app.setAppUserModelId('org.openresearch.desktop');
-  }
   createWindow();
 
   app.on('activate', () => {

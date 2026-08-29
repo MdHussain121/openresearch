@@ -1,7 +1,7 @@
 import logging
 import os
 import uuid
-from typing import Any
+from typing import Any, Literal
 
 import anyio
 from fastapi import (
@@ -287,9 +287,11 @@ def get_paper_status(
         )
 
     # Determine step based on extraction status and OCR
-    ocr_triggered = paper.metadata_json.get("ocr_triggered") if paper.metadata_json else False
-    pre_ocr_chars = paper.metadata_json.get("pre_ocr_chars_per_page") if paper.metadata_json else None
+    meta = paper.metadata_json or {}
+    ocr_triggered = meta.get("ocr_triggered", False)
+    pre_ocr_chars = meta.get("pre_ocr_chars_per_page")
 
+    step: Literal["upload", "extracting", "ocr", "embeddings", "ready"]
     if ocr_triggered:
         step = "ocr"
         step_index = 3  # upload=1, extracting=2, ocr=3, embeddings=4, ready=5
@@ -297,8 +299,8 @@ def get_paper_status(
         # Estimate OCR progress based on pre-ocr chars and current status
         # This is a rough estimate since extraction runs synchronously
         ocr_progress = {
-            "current_page": paper.metadata_json.get("page_count", 0),
-            "total_pages": paper.metadata_json.get("page_count", 0),
+            "current_page": meta.get("page_count", 0),
+            "total_pages": meta.get("page_count", 0),
         } if pre_ocr_chars is not None else None
     else:
         step = "ready"

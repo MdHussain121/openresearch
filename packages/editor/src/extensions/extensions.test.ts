@@ -8,7 +8,7 @@ import { MathEquation } from './math';
 import { TrustMarker } from './trustMarker';
 import { ClaimVerificationMark } from './claimVerification';
 import { Editor } from '@tiptap/core';
-import StarterKit from '@tiptap/starter-kit';
+import { StarterKit } from '@tiptap/starter-kit';
 import { GhostText, ghostTextPluginKey, GhostTextState, createGhostTextSpan } from './ghostText';
 import { TextStyle, FontSize } from './fontSize';
 

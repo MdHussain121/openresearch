@@ -475,7 +475,7 @@ class LiteratureSearchService:
         from app.core.config import settings as _settings
 
         headers: dict[str, str] = {}
-        if getattr(_settings, "SEMANTIC_SCHOLAR_API_KEY", None):
+        if _settings.SEMANTIC_SCHOLAR_API_KEY:
             headers["x-api-key"] = _settings.SEMANTIC_SCHOLAR_API_KEY
 
         client = get_async_http_client()
