@@ -36,9 +36,13 @@ _STARTUP_POLL_INTERVAL_SECONDS = 0.5
 _LOG_TAIL_LINES = 12
 
 
+def _is_windows() -> bool:
+    return os.name == "nt"
+
+
 def _winget_fallback() -> str | None:
     """Locate tabby.exe inside winget's package store (PATH may be stale/empty)."""
-    if os.name != "nt":
+    if not _is_windows():
         return None
     local_app_data = os.environ.get("LOCALAPPDATA", "")
     if not local_app_data:
@@ -124,7 +128,7 @@ def _detached_popen_kwargs(log_handle: IO[bytes]) -> dict[str, Any]:
         "stdout": log_handle,
         "stderr": subprocess.STDOUT,
     }
-    if os.name == "nt":
+    if _is_windows():
         # CREATE_NO_WINDOW keeps the server invisible; DETACHED_PROCESS is
         # mutually exclusive with it and must NOT be combined (MSDN).
         kwargs["creationflags"] = getattr(subprocess, "CREATE_NO_WINDOW", 0) | getattr(

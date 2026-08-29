@@ -43,7 +43,7 @@ def ac_enabled(monkeypatch):
 
 class TestFindBinaryAndVersion:
     def test_winget_links_fallback(self, monkeypatch, tmp_path):
-        monkeypatch.setattr(os, "name", "nt")
+        monkeypatch.setattr(tabby, "_is_windows", lambda: True)
         # Hermetic: ignore any real tabby on this machine's PATH.
         monkeypatch.setattr(tabby.shutil, "which", lambda name: None)
         links = tmp_path / "Microsoft" / "WinGet" / "Links"
@@ -113,13 +113,13 @@ class TestInstallAndServeCommands:
 
 class TestDetachedKwargsAndLogs:
     def test_windows_creation_flags(self, monkeypatch):
-        monkeypatch.setattr(os, "name", "nt")
+        monkeypatch.setattr(tabby, "_is_windows", lambda: True)
         kwargs = _detached_popen_kwargs("log")
         assert kwargs["creationflags"] != 0
         assert "start_new_session" not in kwargs
 
     def test_posix_start_new_session(self, monkeypatch):
-        monkeypatch.setattr(os, "name", "posix")
+        monkeypatch.setattr(tabby, "_is_windows", lambda: False)
         kwargs = _detached_popen_kwargs("log")
         assert kwargs["start_new_session"] is True
 
