@@ -1,7 +1,5 @@
 """Unit coverage for app.services.tabby_setup_service (all I/O injectable)."""
 
-import os
-
 import pytest
 
 import app.services.tabby_setup_service as tabby
