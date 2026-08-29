@@ -655,8 +655,8 @@ def test_find_tabby_binary_falls_back_to_winget_links(tmp_path, monkeypatch):
     links.mkdir(parents=True)
     (links / "tabby.exe").write_bytes(b"MZ")
     monkeypatch.setattr(tabby_setup_service.shutil, "which", lambda name: None)
-    monkeypatch.setattr(tabby_setup_service.os, "name", "nt")
-    monkeypatch.setattr(tabby_setup_service.os, "environ", {"LOCALAPPDATA": str(tmp_path)})
+    monkeypatch.setattr(tabby_setup_service, "_is_windows", lambda: True)
+    monkeypatch.setenv("LOCALAPPDATA", str(tmp_path))
     assert tabby_setup_service.find_tabby_binary() == str(links / "tabby.exe")
 
     # Nothing installed anywhere
@@ -731,13 +731,10 @@ def test_install_command_platforms(monkeypatch):
 
 
 def test_detached_kwargs_posix_branch(monkeypatch):
-    import os as os_module
-
-    monkeypatch.setattr(tabby_setup_service.os, "name", "posix")
+    monkeypatch.setattr(tabby_setup_service, "_is_windows", lambda: False)
     kwargs = tabby_setup_service._detached_popen_kwargs(log_handle=object())
     assert kwargs["start_new_session"] is True
     assert "creationflags" not in kwargs
-    _ = os_module  # keep import meaningful
 
 
 def test_port_occupied_true_and_false():
