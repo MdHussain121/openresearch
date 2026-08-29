@@ -9,6 +9,7 @@ WORKDIR /app
 
 COPY package.json package-lock.json ./
 COPY apps/web/package.json ./apps/web/
+COPY apps/desktop/package.json ./apps/desktop/
 COPY packages/ai/package.json            ./packages/ai/
 COPY packages/citations/package.json     ./packages/citations/
 COPY packages/editor/package.json        ./packages/editor/
@@ -23,7 +24,7 @@ RUN npm ci
 ########## builder ##########
 FROM base AS builder
 WORKDIR /app
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=deps /app ./
 COPY . .
 
 ARG NEXT_PUBLIC_API_URL=http://localhost:8000/api/v1
