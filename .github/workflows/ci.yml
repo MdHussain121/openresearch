@@ -70,7 +70,7 @@ jobs:
       - name: Run Pytest Test Suite
         run: |
           cd apps/api
-          python -m pytest
+          python -m pytest -p no:cacheprovider
 
       - name: Audit Python dependencies
         run: |

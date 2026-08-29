@@ -1265,6 +1265,7 @@ describe('TextStyle and FontSize extensions', () => {
     const updatedHtml = editor.getHTML();
     expect(updatedHtml).not.toContain('font-size: 24px');
     expect(updatedHtml).toContain('Hello world');
+    editor.destroy();
   });
 
   it('supports applying arbitrary custom font size values', () => {
@@ -1279,5 +1280,6 @@ describe('TextStyle and FontSize extensions', () => {
 
     expect(editor.getHTML()).toContain('font-size: 21.5px');
     expect(editor.getHTML()).toContain('data-font-size="21.5px"');
+    editor.destroy();
   });
 });
