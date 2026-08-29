@@ -149,14 +149,20 @@ def test_run_migrations_all_branches(monkeypatch):
     assert ("upgrade", "head") in calls
 
     # 4. missing alembic.ini -> RuntimeError
-    orig_exists = __import__("pathlib").Path.exists
-
-    def fake_exists(self):
-        if str(self).endswith("alembic.ini"):
+    class FakePath:
+        def __init__(self, *args):
+            pass
+        def resolve(self):
+            return self
+        @property
+        def parents(self):
+            return [self, self]
+        def __truediv__(self, other):
+            return self
+        def exists(self):
             return False
-        return orig_exists(self)
 
-    monkeypatch.setattr(__import__("pathlib").Path, "exists", fake_exists)
+    monkeypatch.setattr(app_main, "Path", FakePath)
     with pytest.raises(RuntimeError):
         app_main._run_migrations()
 
