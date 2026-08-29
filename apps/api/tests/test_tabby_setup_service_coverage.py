@@ -112,6 +112,8 @@ class TestInstallAndServeCommands:
 class TestDetachedKwargsAndLogs:
     def test_windows_creation_flags(self, monkeypatch):
         monkeypatch.setattr(tabby, "_is_windows", lambda: True)
+        monkeypatch.setattr(tabby.subprocess, "CREATE_NO_WINDOW", 0x08000000, raising=False)
+        monkeypatch.setattr(tabby.subprocess, "CREATE_NEW_PROCESS_GROUP", 0x00000200, raising=False)
         kwargs = _detached_popen_kwargs("log")
         assert kwargs["creationflags"] != 0
         assert "start_new_session" not in kwargs
