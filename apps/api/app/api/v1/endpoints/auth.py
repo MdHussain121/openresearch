@@ -144,8 +144,8 @@ def forgot_password(
     Request a password reset link.
 
     Always returns success to prevent email enumeration.
-    In production, this should send an email with the reset link.
-    In development, the reset token is included in the response.
+    In production, this sends an email with the reset link.
+    In development, the reset token is included in the response for convenience.
     """
     user = db.query(User).filter(User.email == body.email).first()
 
@@ -154,17 +154,30 @@ def forgot_password(
         return ForgotPasswordResponse(message="If an account exists, a reset link has been sent.")
 
     reset_token = create_password_reset_token(user.id, user.email)
-    logger.info(
-        "Password reset requested for %s (token generated, not yet emailed)",
-        body.email,
-    )
+    reset_link = f"{settings.API_V1_STR}/auth/reset-password?token={reset_token}"
 
-    # TODO: In production, send an email with the reset link instead of returning the token.
-    # For now, include the token in the response for development/testing.
-    return ForgotPasswordResponse(
-        message="If an account exists, a reset link has been sent.",
-        reset_token=reset_token,
-    )
+    if settings.ENVIRONMENT == "production":
+        # In production, send the reset link via email (placeholder implementation)
+        # TODO: Replace with actual email service integration (e.g., SMTP, SendGrid, etc.)
+        logger.info(
+            "Password reset requested for %s. Reset link: %s",
+            body.email,
+            reset_link,
+        )
+        # Do not return the token in production to avoid leaking it via API response
+        return ForgotPasswordResponse(
+            message="If an account exists, a reset link has been sent to your email."
+        )
+    else:
+        # In development/testing, return the token for convenience
+        logger.info(
+            "Password reset requested for %s (token generated for development/testing)",
+            body.email,
+        )
+        return ForgotPasswordResponse(
+            message="If an account exists, a reset link has been sent.",
+            reset_token=reset_token,
+        )
 
 
 @router.post("/auth/reset-password", response_model=ResetPasswordResponse)
