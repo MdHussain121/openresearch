@@ -13,7 +13,7 @@
     "@openresearch/ui": "*",
     "@openresearch/citations": "*",
     "@openresearch/ai": "*",
-    "@tiptap/core": "^3.30.3",
+    "@tiptap/core": "^3.31.0",
     "@tiptap/react": "^3.30.3",
     "@tiptap/pm": "^3.30.3",
     "@tiptap/starter-kit": "^3.30.3",
